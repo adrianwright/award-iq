@@ -420,8 +420,7 @@ def scan() -> int:
             problems.append(f"[{layer}] hero trial {hero_nct} not referenced")
 
     print(f"Scanned {file_count} files across {len(DATA_DIRS)} layers.")
-    print(f"Retained legacy clinical patient IDs: {sorted(known_pt)}")
-    print(f"Retained legacy clinical trial IDs:   {sorted(known_nct)}")
+    print("Validated retained legacy clinical fixture identifiers.")
 
     fabric_problems = validate_fabric_tables()
     problems.extend(fabric_problems)
