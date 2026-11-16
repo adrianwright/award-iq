@@ -150,7 +150,7 @@ python-dotenv==1.2.2
     # via
     #   pydantic-settings
     #   uvicorn
-python-multipart==0.0.32
+python-multipart==0.0.33
     # via mcp
 python-pptx==1.0.2
     # via -r services/api/requirements.txt
