@@ -60,7 +60,8 @@ from `apps/web`.
 ## Connected setup is operator-assisted
 
 The supported infrastructure entry point is **`infra/funding.bicep`**, also selected by
-`infra/azure.yaml` and compiled in CI. Read [deployment prerequisites](docs/deployment.md)
+`infra/azure.yaml`. CI runs secret scanning only; run application and infrastructure checks locally.
+Read [deployment prerequisites](docs/deployment.md)
 before running any provisioning helper.
 
 Use a new Award IQ resource group, workspace, and lakehouse on an explicitly selected **existing
