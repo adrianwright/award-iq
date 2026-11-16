@@ -1,0 +1,3 @@
+source_id,notice_id,source,amount,status,owner_id,evidence_id
+MATCH-2026-CAPITAL,FO-2026-117,2026 capital plan,1800000,Confirmed,FIN-02,award-iq-foundry-match-memo-v2
+MATCH-RESERVE-CANDIDATE,FO-2026-117,Capital reserve,450000,Proposed,FIN-02,award-iq-work-match-huddle-v2

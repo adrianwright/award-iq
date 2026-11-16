@@ -1,0 +1,4 @@
+criterion_id,notice_id,criterion,status,evidence_id
+FO-2026-117-ELIG-01,FO-2026-117,Eligible local public applicant,met,award-iq-foundry-applicant-eligibility-v1
+FO-2026-117-ELIG-02,FO-2026-117,Regional partner commitment letter,uncertain,award-iq-foundry-amendment-2-v1
+FO-2026-117-ELIG-03,FO-2026-117,Required 25% local match confirmed,uncertain,award-iq-foundry-match-policy-v1

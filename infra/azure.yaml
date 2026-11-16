@@ -1,6 +1,6 @@
-name: amc-iq
+name: award-iq
 metadata:
-  template: amc-iq-foundry-iq-poc
+  template: award-iq-funding-readiness-poc
 
 # This azure.yaml is intentionally located under infra/ to honor the authoring
 # boundary for this task. Run azd from this directory:

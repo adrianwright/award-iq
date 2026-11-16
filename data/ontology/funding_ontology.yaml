@@ -1,0 +1,89 @@
+meta:
+  name: award-iq-funding-ontology
+  version: 1
+  domain: grant-eligibility-and-funding-readiness
+  source_of_truth: data/fabric/funding_ops
+  disclaimer: Synthetic grant decision support. Human funding decisions remain authoritative.
+
+entities:
+  FundingOpportunity:
+    table: funding_opportunities.csv
+    key: notice_id
+    attributes: [title, agency, deadline, as_of_date, total_project_cost, match_rate, match_required, status]
+  Amendment:
+    table: amendments.csv
+    key: [notice_id, amendment]
+    attributes: [published_date, effective_date, status, match_rate, regional_partner_required, supersedes]
+  EligibilityCriterion:
+    table: eligibility_criteria.csv
+    key: criterion_id
+    attributes: [notice_id, criterion, status, evidence_id]
+  BudgetLine:
+    table: budget_lines.csv
+    key: line_id
+    attributes: [notice_id, basis, amount, classification]
+  MatchSource:
+    table: match_sources.csv
+    key: source_id
+    attributes: [notice_id, source, amount, status, owner_id, evidence_id]
+  Partner:
+    table: partners.csv
+    key: partner_id
+    attributes: [notice_id, name, current_commitment, historical_evidence]
+  Person:
+    table: people.csv
+    key: person_id
+    attributes: [name, role, email]
+  ApprovalRecord:
+    table: approvals.csv
+    key: approval_id
+    attributes: [notice_id, review_date, decision, conditions, record_type]
+  ProposalTask:
+    table: proposal_tasks.csv
+    key: task_id
+    attributes: [notice_id, description, owner_id, status, due_date]
+  SchedulingSlot:
+    table: scheduling_slots.csv
+    key: slot_id
+    attributes: [notice_id, reviewer_id, date, start_time, end_time, timezone, status]
+  StaffWorkload:
+    table: staff_workload.csv
+    key: [person_id, notice_id]
+    attributes: [unavailable_from, unavailable_through, work_must_finish_by]
+  CommunityMetric:
+    table: community_metrics.csv
+    key: metric_id
+    attributes: [notice_id, metric, value, as_of_date]
+  PriorProposal:
+    table: prior_proposals.csv
+    key: proposal_id
+    attributes: [notice_id, year, partner_id, evidence_id]
+  ProgramPerformance:
+    table: program_performance.csv
+    key: [program_id, measure]
+    attributes: [notice_id, value, as_of_date]
+  Submission:
+    table: submissions.csv
+    key: submission_id
+    attributes: [notice_id, status, submitted_at]
+
+relationships:
+  - [FundingOpportunity, has_amendment, Amendment, notice_id]
+  - [FundingOpportunity, has_criterion, EligibilityCriterion, notice_id]
+  - [FundingOpportunity, has_budget, BudgetLine, notice_id]
+  - [FundingOpportunity, has_match_source, MatchSource, notice_id]
+  - [FundingOpportunity, has_partner, Partner, notice_id]
+  - [ProposalTask, owned_by, Person, owner_id]
+  - [FundingOpportunity, has_decision_record, ApprovalRecord, notice_id]
+  - [FundingOpportunity, has_review_slot, SchedulingSlot, notice_id]
+  - [FundingOpportunity, has_community_metric, CommunityMetric, notice_id]
+  - [FundingOpportunity, has_prior_proposal, PriorProposal, notice_id]
+  - [FundingOpportunity, has_program_performance, ProgramPerformance, notice_id]
+  - [FundingOpportunity, has_submission, Submission, notice_id]
+
+rules:
+  - Latest effective amendment on or before as_of_date controls.
+  - Confirmed match is the sum of MatchSource rows with status Confirmed; proposed rows are excluded.
+  - A missing partner letter is unresolved evidence, not proof of categorical ineligibility.
+  - ApprovalRecord is historical metadata, not evidence that funding was approved.
+  - ProposalTask output status is Drafted (not submitted); data retrieval never makes a funding decision.

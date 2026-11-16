@@ -1,4 +1,4 @@
-# AMC IQ Foundry hosted-agent definition (declarative reference).
+# Award IQ Foundry hosted-agent definition (declarative reference).
 #
 # NOTE: The verified, working way to create the agent is the Python script
 # `agent/provisioning/live/create_agent.py` (used by provision_all.ps1). That script
@@ -7,8 +7,8 @@
 # flow. Model and tool availability are operator-selected; the live provisioning scripts are
 # authoritative.
 
-name: amciq-agent-eligibility
-description: Precision-oncology trial-eligibility assistant for the AMC IQ proof-of-concept.
+name: award-iq-fabric-funding-agent
+description: Human-reviewed grant eligibility and funding-readiness assistant for Award IQ.
 kind: hosted
 protocol: responses
 
@@ -30,8 +30,8 @@ tools:
   - name: foundry_iq
     label: Foundry IQ
     type: mcp
-    connection: ${FOUNDRY_KB_MCP_CONNECTION_NAME}
-    serverUrl: ${FOUNDRY_KB_MCP_ENDPOINT}
+    connection: ${AWARD_IQ_FOUNDRY_FUNDING_KB_CONNECTION}
+    serverUrl: ${AWARD_IQ_FOUNDRY_FUNDING_KB_ENDPOINT}
     auth:
       type: ProjectManagedIdentity
       audience: https://search.azure.com/
@@ -58,8 +58,7 @@ tools:
     enabled: ${USE_LIVE_WEB}
     connection: ${WEB_SEARCH_CONNECTION_NAME}
     allowedDomains:
-      - clinicaltrials.gov
-      - fda.gov
+      - grants.gov
 
   # Reference only: the production web path invokes Work IQ A2A through the FastAPI backend after
   # OBO. Keep this manifest aligned for future hosted-agent delegation.

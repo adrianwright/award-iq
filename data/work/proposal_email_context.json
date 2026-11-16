@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "connection": "fixture only; not a live email connection",
+  "notice_id": "FO-2026-117",
+  "items": [
+    {
+      "date": "2024-07-12",
+      "subject": "Resilience proposal partner letter",
+      "from": "Regional Transit Authority",
+      "text": "A partner letter was provided for the 2024 resilience proposal. This does not constitute a current FO-2026-117 commitment."
+    }
+  ]
+}

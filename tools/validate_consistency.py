@@ -1,11 +1,7 @@
-"""Consistency validator for the synthetic proof-of-concept data package.
+"""Consistency validator for the synthetic data packages.
 
-Scans the generated content directories (data/foundry_docs, data/fabric, data/work,
-data/web) for proof-of-concept identifiers and verifies every patient/trial ID that appears is
-defined in the canonical registry (data/registry/registry.yaml). Also confirms the
-hero patient and hero trial appear in every layer, and validates the generated Fabric
-entity tables for referential integrity, unchanged hero rows, and at least one
-criterion per trial.
+Checks retained source-project fixtures for identifier consistency, then validates the active
+Award IQ funding tables, fixed scenario dates, calculation invariants, and deterministic generation.
 
 Usage:  python tools/validate_consistency.py
 Exit code 0 = consistent, 1 = problems found.
@@ -17,13 +13,17 @@ import json
 import re
 import sys
 import tempfile
+from datetime import date
 from pathlib import Path
 from urllib.parse import urlsplit
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "data" / "registry"))
 from data.fabric.generate import generate as generate_fabric_tables  # noqa: E402
+from data.fabric.funding_ops.generate import generate as generate_funding_tables  # noqa: E402
 from loader import hero_patient, hero_trial, patient_ids, trial_ids  # noqa: E402
 
 FABRIC_DIR = ROOT / "data" / "fabric"
@@ -155,11 +155,150 @@ def validate_generated_fabric_output() -> list[str]:
     return problems
 
 
+def validate_funding_ops() -> list[str]:
+    """Validate Award IQ funding table coverage, arithmetic, dates, and deterministic generation."""
+    problems: list[str] = []
+    directory = FABRIC_DIR / "funding_ops"
+    expected_names = {
+        "amendments.csv", "approvals.csv", "budget_lines.csv", "community_metrics.csv",
+        "eligibility_criteria.csv", "funding_opportunities.csv", "match_sources.csv",
+        "partners.csv", "people.csv", "prior_proposals.csv", "program_performance.csv",
+        "scheduling_slots.csv", "staff_workload.csv", "submissions.csv", "proposal_tasks.csv",
+    }
+    actual_names = {path.name for path in directory.glob("*.csv")}
+    if actual_names != expected_names:
+        problems.append(
+            f"[funding] table set differs: missing={sorted(expected_names - actual_names)}, "
+            f"unexpected={sorted(actual_names - expected_names)}"
+        )
+        return problems
+
+    tables = {name[:-4]: _read_csv(directory / name) for name in sorted(expected_names)}
+    notice = next((row for row in tables["funding_opportunities"] if row["notice_id"] == "FO-2026-117"), None)
+    if notice is None:
+        return ["[funding] FO-2026-117 is missing from funding_opportunities"]
+    as_of = date.fromisoformat(notice["as_of_date"])
+    deadline = date.fromisoformat(notice["deadline"])
+    if as_of.isoformat() != "2026-11-16" or deadline.isoformat() != "2026-12-16":
+        problems.append("[funding] pinned scenario date or application deadline changed")
+    if (deadline - as_of).days != 30:
+        problems.append("[funding] scenario deadline is not exactly 30 days after its as-of date")
+
+    amendments = [
+        row for row in tables["amendments"]
+        if row["notice_id"] == notice["notice_id"] and date.fromisoformat(row["effective_date"]) <= as_of
+    ]
+    latest = max(amendments, key=lambda row: (row["effective_date"], int(row["amendment"]))) if amendments else None
+    if latest is None or latest["amendment"] != "2" or latest["status"] != "Current":
+        problems.append("[funding] latest effective amendment is not current Amendment 2")
+    else:
+        required = round(int(notice["total_project_cost"]) * float(latest["match_rate"]))
+        if latest["match_rate"] != "0.25" or latest["regional_partner_required"].casefold() != "true":
+            problems.append("[funding] Amendment 2 must require 25% match and a regional partner")
+        budget = next(
+            (row for row in tables["budget_lines"] if row["notice_id"] == notice["notice_id"] and row["classification"] == "Required match"),
+            None,
+        )
+        if budget is None or int(budget["amount"]) != required:
+            problems.append("[funding] required match does not match the current amendment calculation")
+
+    sources = [row for row in tables["match_sources"] if row["notice_id"] == notice["notice_id"]]
+    confirmed = sum(int(row["amount"]) for row in sources if row["status"].casefold() == "confirmed")
+    proposed = sum(int(row["amount"]) for row in sources if row["status"].casefold() == "proposed")
+    if confirmed != 1_800_000 or proposed != 450_000:
+        problems.append(
+            f"[funding] expected $1,800,000 confirmed and $450,000 proposed; got {confirmed} and {proposed}"
+        )
+
+    people_ids = {row["person_id"] for row in tables["people"]}
+    for task in tables["proposal_tasks"]:
+        if task["owner_id"] not in people_ids:
+            problems.append(f"[funding] {task['task_id']} has unknown owner {task['owner_id']}")
+    task_ids = {row["task_id"] for row in tables["proposal_tasks"]}
+    if task_ids != {"TASK-117-MATCH", "TASK-117-PARTNER"}:
+        problems.append("[funding] required match and partner tasks are missing")
+    else:
+        expected_tasks = {
+            "TASK-117-MATCH": ("FIN-02", "2026-11-18"),
+            "TASK-117-PARTNER": ("PM-01", "2026-11-20"),
+        }
+        for task in tables["proposal_tasks"]:
+            if (task["owner_id"], task["due_date"]) != expected_tasks[task["task_id"]]:
+                problems.append(f"[funding] {task['task_id']} owner or due date drifted")
+
+    review = next(
+        (row for row in tables["approvals"] if row["notice_id"] == notice["notice_id"]),
+        None,
+    )
+    if review is None or review["decision"] != "Pursue - pending" or "not an approval" not in review["record_type"].casefold():
+        problems.append("[funding] pending pursuit record or its non-approval boundary is missing")
+    partner = next(
+        (row for row in tables["partners"] if row["notice_id"] == notice["notice_id"]),
+        None,
+    )
+    if partner is None or partner["current_commitment"] != "Not received":
+        problems.append("[funding] current partner commitment must remain unresolved")
+    slot = next(
+        (row for row in tables["scheduling_slots"] if row["notice_id"] == notice["notice_id"]),
+        None,
+    )
+    if slot is None or (
+        slot["date"], slot["start_time"], slot["end_time"], slot["timezone"]
+    ) != ("2026-11-19", "10:00", "11:00", "America/Los_Angeles (PST, UTC-08:00)"):
+        problems.append("[funding] executive-review window or explicit timezone drifted")
+    legal = next(
+        (row for row in tables["staff_workload"] if row["notice_id"] == notice["notice_id"]),
+        None,
+    )
+    if legal is None or (
+        legal["person_id"], legal["unavailable_from"], legal["unavailable_through"],
+        legal["work_must_finish_by"],
+    ) != ("LEGAL-01", "2026-11-23", "2026-11-27", "2026-11-20"):
+        problems.append("[funding] legal availability deadline drifted")
+    submission = next(
+        (row for row in tables["submissions"] if row["notice_id"] == notice["notice_id"]),
+        None,
+    )
+    if submission is None or submission["status"] != "Not submitted" or submission["submitted_at"]:
+        problems.append("[funding] application must remain unsubmitted")
+
+    registry_path = ROOT / "data" / "registry" / "funding_registry.yaml"
+    ontology_path = ROOT / "data" / "ontology" / "funding_ontology.yaml"
+    try:
+        funding_registry = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+        funding_ontology = yaml.safe_load(ontology_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        problems.append(f"[funding] registry or ontology cannot be loaded: {exc}")
+    else:
+        if funding_registry["resources"].get("fabric_dataset") != "award_iq_fabric_funding_ops":
+            problems.append("[funding] Fabric funding dataset name drifted")
+        if funding_registry["funding_opportunities"][0]["id"] != notice["notice_id"]:
+            problems.append("[funding] canonical registry and operations table notice IDs differ")
+        ontology_tables = {
+            entity.get("table")
+            for entity in funding_ontology.get("entities", {}).values()
+        }
+        missing_ontology_tables = {
+            name.removesuffix(".csv") + ".csv" for name in expected_names
+        } - ontology_tables
+        if missing_ontology_tables:
+            problems.append(f"[funding] ontology is missing tables: {sorted(missing_ontology_tables)}")
+
+    with tempfile.TemporaryDirectory(prefix="award-iq-funding-") as temp_dir:
+        generated = Path(temp_dir)
+        generate_funding_tables(generated)
+        for name in sorted(expected_names):
+            if (generated / name).read_bytes() != (directory / name).read_bytes():
+                problems.append(f"[funding] {name} differs from deterministic generator output")
+
+    return problems
+
+
 def _source_url_allowed(url: str, known_nct: set[str]) -> bool:
     parsed = urlsplit(url.rstrip(".,);"))
     if parsed.scheme != "https":
         return False
-    if parsed.hostname == "amciq.example.invalid":
+    if parsed.hostname in {"amciq.example.invalid", "award-iq.example.invalid"}:
         return True
     return (
         parsed.hostname == "clinicaltrials.gov"
@@ -281,18 +420,25 @@ def scan() -> int:
             problems.append(f"[{layer}] hero trial {hero_nct} not referenced")
 
     print(f"Scanned {file_count} files across {len(DATA_DIRS)} layers.")
-    print(f"Known patients: {sorted(known_pt)}")
-    print(f"Known trials:   {sorted(known_nct)}")
+    print(f"Retained legacy clinical patient IDs: {sorted(known_pt)}")
+    print(f"Retained legacy clinical trial IDs:   {sorted(known_nct)}")
 
     fabric_problems = validate_fabric_tables()
     problems.extend(fabric_problems)
-    print(f"Validated Fabric entity tables: {'OK' if not fabric_problems else f'{len(fabric_problems)} problem(s)'}.")
+    print(f"Validated retained clinical Fabric tables: {'OK' if not fabric_problems else f'{len(fabric_problems)} problem(s)'}.")
 
     generation_problems = validate_generated_fabric_output()
     problems.extend(generation_problems)
     print(
-        "Validated deterministic Fabric regeneration: "
+        "Validated retained clinical Fabric regeneration: "
         f"{'OK' if not generation_problems else f'{len(generation_problems)} problem(s)'}."
+    )
+
+    funding_problems = validate_funding_ops()
+    problems.extend(funding_problems)
+    print(
+        "Validated Award IQ funding tables: "
+        f"{'OK' if not funding_problems else f'{len(funding_problems)} problem(s)'}."
     )
 
     provenance_problems = validate_synthetic_provenance(known_nct)
@@ -308,9 +454,8 @@ def scan() -> int:
             print(f"  - {p}")
         return 1
     print(
-        "\nOK, all referenced IDs are canonical; hero patient & trial appear in every layer; "
-        "Fabric tables have full referential integrity, unchanged hero rows, and byte-identical "
-        "deterministic regeneration."
+        "\nOK, retained legacy fixtures are consistent and Award IQ funding tables, dates, "
+        "calculations, and deterministic generation validate."
     )
     return 0
 

@@ -6,7 +6,7 @@ param location string = resourceGroup().location
 @description('Tenant for Key Vault and managed-identity auth.')
 param tenantId string
 
-@description('API container image. azd deploy replaces this placeholder with the built AMC IQ API image.')
+@description('API container image. azd deploy replaces this placeholder with the built Award IQ API image.')
 param apiContainerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
 @description('Port exposed by the API container.')
@@ -28,10 +28,10 @@ param apiContainerAppName string
 param staticWebAppName string
 
 @description('Azure Container Registry for azd-built API images.')
-param containerRegistryName string = take(toLower('amciq${uniqueString(resourceGroup().id)}acr'), 50)
+param containerRegistryName string = take(toLower('awardi${uniqueString(resourceGroup().id)}acr'), 50)
 
 @description('Key Vault for future app secrets. Prefer managed identity and avoid storing keys.')
-param keyVaultName string = take(toLower('amciq${uniqueString(resourceGroup().id)}kv'), 24)
+param keyVaultName string = take(toLower('awardi${uniqueString(resourceGroup().id)}kv'), 24)
 
 @description('User-assigned managed identity shared by the API and role assignments.')
 param managedIdentityName string
@@ -86,19 +86,19 @@ param specialistProtocolAgentName string = ''
 param specialistWorkflowAgentName string = ''
 param specialistEvidenceAgentName string = ''
 
-@description('Application client ID for the confidential amciq-workiq-client registration.')
+@description('Application client ID for an operator-owned Award IQ confidential client registration.')
 param workIqClientId string
 
 @description('Application client ID for the operator-provided public SPA registration.')
 param webClientId string
 
-@description('Exact audience accepted by the AMC IQ API access-token validator.')
+@description('Exact audience accepted by the Award IQ API access-token validator.')
 param apiAudience string
 
-@description('Delegated scope claim required by protected AMC IQ API endpoints.')
+@description('Delegated scope claim required by protected Award IQ API endpoints.')
 param apiRequiredScope string = 'access_as_user'
 
-@description('Fully qualified delegated AMC IQ API scope requested by the SPA.')
+@description('Fully qualified delegated Award IQ API scope requested by the SPA.')
 param webApiScope string
 
 @description('Existing exportable Key Vault certificate secret read by the API managed identity.')
@@ -127,7 +127,7 @@ var effectiveSearchEndpoint = empty(searchEndpoint) ? 'https://${existingSearchS
 var effectiveProjectEndpoint = empty(projectEndpoint) ? 'https://${existingFoundryAccountName}.services.ai.azure.com/api/projects/${foundryProjectName}' : projectEndpoint
 
 module identity 'modules/identity.bicep' = {
-  name: 'amciq-identity'
+  name: 'award-iq-identity'
   params: {
     location: location
     managedIdentityName: managedIdentityName
@@ -136,7 +136,7 @@ module identity 'modules/identity.bicep' = {
 }
 
 module observability 'modules/observability.bicep' = {
-  name: 'amciq-observability'
+  name: 'award-iq-observability'
   params: {
     location: location
     logAnalyticsName: logAnalyticsName
@@ -146,7 +146,7 @@ module observability 'modules/observability.bicep' = {
 }
 
 module keyVault 'modules/keyvault.bicep' = {
-  name: 'amciq-keyvault'
+  name: 'award-iq-keyvault'
   params: {
     location: location
     tenantId: tenantId
@@ -158,7 +158,7 @@ module keyVault 'modules/keyvault.bicep' = {
 }
 
 module apps 'modules/apps.bicep' = {
-  name: 'amciq-apps'
+  name: 'award-iq-apps'
   params: {
     location: location
     containerAppsEnvironmentName: containerAppsEnvironmentName
@@ -204,7 +204,7 @@ module apps 'modules/apps.bicep' = {
 }
 
 module searchRole 'modules/search-role.bicep' = {
-  name: 'amciq-api-search-reader'
+  name: 'award-iq-api-search-reader'
   scope: resourceGroup(subscription().subscriptionId, existingSearchResourceGroupName)
   params: {
     searchServiceName: existingSearchServiceName
@@ -214,7 +214,7 @@ module searchRole 'modules/search-role.bicep' = {
 }
 
 module foundryRole 'modules/foundry-role.bicep' = {
-  name: 'amciq-api-foundry-user'
+  name: 'award-iq-api-foundry-user'
   scope: resourceGroup(subscription().subscriptionId, existingFoundryResourceGroupName)
   params: {
     foundryAccountName: existingFoundryAccountName

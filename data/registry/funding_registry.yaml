@@ -1,0 +1,47 @@
+meta:
+  product: Award IQ
+  resource_slug: award-iq
+  scenario_as_of: "2026-11-16"
+  disclaimer: Synthetic grant decision support. Human funding decisions remain authoritative.
+
+resources:
+  foundry_project: award-iq-foundry-project
+  foundry_knowledge_base: award-iq-foundry-funding-kb
+  foundry_knowledge_source: award-iq-foundry-funding-docs-ks
+  fabric_data_agent: award-iq-fabric-funding-agent
+  fabric_dataset: award_iq_fabric_funding_ops
+
+funding_opportunities:
+  - id: FO-2026-117
+    title: Community Resilience Infrastructure Grant
+    hero: true
+    as_of_date: "2026-11-16"
+    deadline: "2026-12-16"
+    total_eligible_project_costs: 9000000
+    current_amendment: 2
+    required_match_rate: 0.25
+    required_match: 2250000
+    confirmed_match: 1800000
+    confirmed_match_gap: 450000
+    pursuit_status: Pursue - pending
+    tasks:
+      - id: TASK-117-MATCH
+        owner: FIN-02
+        due: "2026-11-18"
+      - id: TASK-117-PARTNER
+        owner: PM-01
+        due: "2026-11-20"
+
+people:
+  - id: PM-01
+    display: Jordan Lee
+    role: Proposal Manager
+  - id: FIN-02
+    display: Maria Santos
+    role: Finance
+  - id: EXEC-01
+    display: Dr. Elena Ruiz
+    role: Executive Reviewer
+  - id: LEGAL-01
+    display: Sam Patel
+    role: Legal

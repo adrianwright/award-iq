@@ -1,4 +1,4 @@
-"""Load AMC IQ synthetic CSVs into the Fabric Lakehouse as Delta tables.
+"""Load Award IQ synthetic funding CSVs into a Fabric Lakehouse as Delta tables.
 
 1. Upload data/fabric/*.csv to OneLake Files/csv/ under the lakehouse.
 2. Call the Fabric 'Load to Tables' API to convert each CSV -> Delta table.
@@ -21,19 +21,18 @@ WS = required_environment("FABRIC_WS")
 LH = required_environment("FABRIC_LH")
 ONELAKE_TOKEN = required_environment("ONELAKE_TOKEN")
 FABRIC_TOKEN = required_environment("FABRIC_TOKEN")
-CSV_DIR = Path(os.environ.get("CSV_DIR", "data/fabric"))
+CSV_DIR = Path(os.environ.get("CSV_DIR", "data/fabric/funding_ops"))
 
 ONELAKE = "https://onelake.dfs.fabric.microsoft.com"
 FABRIC = "https://api.fabric.microsoft.com/v1"
 
-# All 16 ontology entity tables (data/fabric/*.csv). The original proof-of-concept loaded only the first 7;
-# the Fabric Ontology binds Criterion, Biomarker, Amendment, and the rest, so the full cohort is
-# loaded here. Idempotent: each table is loaded with mode Overwrite.
+# Grant-operations tables for award_iq_fabric_funding_ops. Idempotent: each table is loaded with
+# mode Overwrite. This loader uploads only when explicitly run with operator-supplied Fabric tokens.
 TABLES = [
-    "sites", "people", "patient_registry", "biomarkers", "labs",
-    "treatment_history", "comorbidities", "adverse_events", "recist_assessments",
-    "consent", "trials", "trial_criteria", "amendments", "trial_enrollment",
-    "coordinator_workload", "scheduling_slots",
+    "amendments", "approvals", "budget_lines", "community_metrics",
+    "eligibility_criteria", "funding_opportunities", "match_sources", "partners",
+    "people", "prior_proposals", "program_performance", "proposal_tasks",
+    "scheduling_slots", "staff_workload", "submissions",
 ]
 
 

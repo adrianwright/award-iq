@@ -1,5 +1,13 @@
 [
   {
+    "file": "FO-2026-117_agency_guidance_v1.md",
+    "title": "Synthetic external agency guidance snapshot for FO-2026-117",
+    "source_url": "https://award-iq.example.invalid/guidance/FO-2026-117",
+    "source_type": "agency_guidance",
+    "notice_id": "FO-2026-117",
+    "synthetic": true
+  },
+  {
     "file": "clinicaltrials_NCT99004324.json",
     "title": "Synthetic ClinicalTrials.gov-Style Record: NCT99004324",
     "source_url": "https://clinicaltrials.gov/study/NCT99004324",

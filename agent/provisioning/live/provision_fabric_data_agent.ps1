@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-  Provision the LIVE Fabric IQ layer for the AMC IQ proof-of-concept, VERIFIED working 2026-07-06.
+  Provision a Fabric Data Agent over Award IQ funding operations.
 .DESCRIPTION
   Creates, configures, and PUBLISHES a Fabric Data Agent entirely via REST (no GUI):
-    1. Lakehouse `amciq_fabric_oncology_clinical` in the AMC IQ workspace
-    2. Load data/fabric/*.csv as Delta tables  (see load_fabric_lakehouse.py)
+    1. Operator-named Lakehouse for the award_iq_fabric_funding_ops dataset
+    2. Load data/fabric/funding_ops/*.csv as Delta tables (see load_fabric_lakehouse.py)
     3. Operator-named Data Agent item
     4. Reconcile the agent to the Lakehouse as its only staging datasource + select all tables
     5. Set AI instructions + publish
@@ -26,12 +26,12 @@ param(
   [ValidateNotNullOrEmpty()]
   [string]$DataAgentName,
   [string]$DataAgentId = "",
-  [string]$CsvDir = "",   # defaults to <repo>/data/fabric
+  [string]$CsvDir = "",   # defaults to <repo>/data/fabric/funding_ops
   [switch]$PrepareOnly
 )
 $ErrorActionPreference = "Stop"
 $repo = (Resolve-Path "$PSScriptRoot\..\..\..").Path
-if (-not $CsvDir) { $CsvDir = Join-Path $repo "data\fabric" }
+if (-not $CsvDir) { $CsvDir = Join-Path $repo "data\fabric\funding_ops" }
 function Fabric-Token { az account get-access-token --scope "https://api.fabric.microsoft.com/.default" --query accessToken -o tsv }
 function H { @{ Authorization = "Bearer $(Fabric-Token)"; "Content-Type" = "application/json" } }
 $api = "https://api.fabric.microsoft.com/v1/workspaces/$WorkspaceId"
@@ -42,7 +42,7 @@ if ($LakehouseId) {
 } else {
   $lh = (Invoke-RestMethod -Headers (H) -Uri "$api/lakehouses").value | Where-Object displayName -eq $LakehouseName
   if (-not $lh) {
-    $body = @{ displayName = $LakehouseName; description = "AMC IQ synthetic clinical/operational oncology data (Fabric IQ)." } | ConvertTo-Json
+    $body = @{ displayName = $LakehouseName; description = "Award IQ synthetic funding operations data (Fabric IQ)." } | ConvertTo-Json
     $lh = (Invoke-WebRequest -Method Post -Headers (H) -Uri "$api/lakehouses" -Body $body).Content | ConvertFrom-Json
   }
   $lhId = $lh.id
@@ -56,7 +56,7 @@ if ($DataAgentId) {
 } else {
   $da = (Invoke-RestMethod -Headers (H) -Uri "$api/items").value | Where-Object { $_.type -eq "DataAgent" -and $_.displayName -eq $DataAgentName }
   if (-not $da) {
-    $body = @{ displayName = $DataAgentName; type = "DataAgent"; description = "AMC IQ Fabric Data Agent over synthetic clinical data." } | ConvertTo-Json
+    $body = @{ displayName = $DataAgentName; type = "DataAgent"; description = "Award IQ Fabric Data Agent over synthetic funding data." } | ConvertTo-Json
     $da = (Invoke-WebRequest -Method Post -Headers (H) -Uri "$api/items" -Body $body).Content | ConvertFrom-Json
   }
   $daId = $da.id
@@ -120,22 +120,21 @@ if ($PrepareOnly) {
 Write-Host "5) Select all tables" -ForegroundColor Cyan
 $el = "$b/staging/datasources/$($lakehouseSource.id)/elements"
 $requiredTables = @(
-  "adverse_events",
   "amendments",
-  "biomarkers",
-  "comorbidities",
-  "consent",
-  "coordinator_workload",
-  "labs",
-  "patient_registry",
+  "approvals",
+  "budget_lines",
+  "community_metrics",
+  "eligibility_criteria",
+  "funding_opportunities",
+  "match_sources",
+  "partners",
   "people",
-  "recist_assessments",
+  "prior_proposals",
+  "program_performance",
+  "proposal_tasks",
   "scheduling_slots",
-  "sites",
-  "treatment_history",
-  "trial_criteria",
-  "trial_enrollment",
-  "trials"
+  "staff_workload",
+  "submissions"
 )
 $tables = @()
 $missingTables = $requiredTables
@@ -183,8 +182,8 @@ if ($missingSelections) {
 Write-Host "   selected: $($tables.displayName -join ', ')" -ForegroundColor Green
 
 Write-Host "6) Instructions + publish" -ForegroundColor Cyan
-$instr = "You answer questions about synthetic oncology patients and clinical trial operations using the Lakehouse tables. patient_registry (demographics, ECOG, diagnosis, stage), labs (lab_date/lab_type/value; CrCl_CKD-EPI is renal function in mL/min), treatment_history (prior therapies incl platinum doublets), trials (trial_id, crcl_min, ecog_max, biomarker_required), trial_enrollment, coordinator_workload, scheduling_slots. Patient IDs look like PT-1042; trial IDs like NCT99004324. For a patient's latest CrCl, return the most recent labs row where lab_type='CrCl_CKD-EPI'. Give precise values with dates. Do not give medical advice."
+$instr = "You answer questions about Award IQ's synthetic grant opportunity, amendment, eligibility, budget, match sources, partners, people, proposal tasks, review slots, workload, and submission state. Preserve notice FO-2026-117 and task IDs. Use the latest effective amendment as of the fixed scenario date. Return exact values and dates. Count only Confirmed match sources; proposed funds are not confirmed. Distinguish missing partner evidence from a negative eligibility finding. Never make funding decisions, submit tasks, or claim an approval occurred."
 Invoke-RestMethod -Method Patch -Headers (H) -Uri "$b/staging/settings" -Body (@{ aiInstructions = $instr } | ConvertTo-Json) | Out-Null
-Invoke-WebRequest -Method Post -Headers (H) -Uri "$b/staging/publish" -Body (@{ publishedDescription = "AMC IQ Fabric Data Agent v1" } | ConvertTo-Json) | Out-Null
+Invoke-WebRequest -Method Post -Headers (H) -Uri "$b/staging/publish" -Body (@{ publishedDescription = "Award IQ Fabric funding agent v1" } | ConvertTo-Json) | Out-Null
 Write-Host "   PUBLISHED." -ForegroundColor Green
 Write-Host "   workspaceId=$WorkspaceId  dataAgentId=$daId" -ForegroundColor Yellow

@@ -239,7 +239,7 @@ def test_evidence_doc_serves_whitelisted_source() -> None:
     response = client.get("/api/evidence/doc", params={"path": "foundry_docs/protocol_NCT99004324.md"})
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "AMC IQ synthetic source document" in response.text
+    assert "Award IQ synthetic source document" in response.text
 
 
 def test_evidence_doc_rejects_traversal_and_unknown_dir() -> None:

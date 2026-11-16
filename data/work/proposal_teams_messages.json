@@ -1,0 +1,17 @@
+{
+  "synthetic": true,
+  "connection": "fixture only; not a live Teams connection",
+  "notice_id": "FO-2026-117",
+  "messages": [
+    {
+      "date": "2026-11-09",
+      "author": "Jordan Lee (PM-01)",
+      "text": "TASK-117-PARTNER is open for the current Regional Transit Authority commitment letter, due 2026-11-20. The 2024 letter is background only."
+    },
+    {
+      "date": "2026-11-09",
+      "author": "Maria Santos (FIN-02)",
+      "text": "TASK-117-MATCH remains open. I will confirm capital-reserve availability by 2026-11-18; it is not confirmed today."
+    }
+  ]
+}

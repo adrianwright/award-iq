@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html as _html
+import json
 import re
 from dataclasses import asdict
 from typing import Any
@@ -14,18 +15,19 @@ from app.auth import AuthenticatedUser, require_api_user
 from app.config import get_settings
 from app.eligibility import EligibilityUnavailable, evaluate_eligibility
 from app.fabric_status import get_fabric_status
+from app.funding import FundingAssessment, assess_funding
 from app.orchestrator import Orchestrator
 from app.registry import load_registry, maybe_find_by_id
-from app.schemas import AskRequest, AskResult
+from app.schemas import AskRequest, AskResult, Source
 from app.streaming import sse_response
 
 settings = get_settings()
 orchestrator = Orchestrator(settings=settings)
 
-_ALLOWED_DOC_DIRS = {"foundry_docs", "work"}
+_ALLOWED_DOC_DIRS = {"foundry_docs", "work", "web", "funding_ops"}
 _DOC_NAME = re.compile(r"[A-Za-z0-9._-]+\.(md|json)$")
 
-app = FastAPI(title="AMC IQ API", version="0.1.0")
+app = FastAPI(title="Award IQ API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -57,7 +59,12 @@ def evidence_doc(path: str) -> HTMLResponse:
     if len(parts) != 2 or parts[0] not in _ALLOWED_DOC_DIRS or not _DOC_NAME.fullmatch(parts[1]):
         raise HTTPException(status_code=404, detail="Document not found")
     subdir, name = parts
-    base = (settings.DATA_DIR / subdir).resolve()
+    base_dir = (
+        settings.DATA_DIR / "fabric" / "funding_ops"
+        if subdir == "funding_ops"
+        else settings.DATA_DIR / subdir
+    )
+    base = base_dir.resolve()
     target = (base / name).resolve()
     if base not in target.parents or not target.is_file():
         raise HTTPException(status_code=404, detail="Document not found")
@@ -73,13 +80,57 @@ def evidence_doc(path: str) -> HTMLResponse:
         "border-radius:8px;padding:1.25rem}"
         ".src{color:#6b7280;font-size:12px;margin-bottom:1rem;text-transform:uppercase;"
         "letter-spacing:.05em}</style></head>"
-        f"<body><div class='src'>AMC IQ synthetic source document &middot; {title}</div>"
+        f"<body><div class='src'>Award IQ synthetic source document &middot; {title}</div>"
         f"<pre>{body}</pre></body></html>"
     )
     return HTMLResponse(page)
 
 
-@app.post("/api/ask", response_model=AskResult)
+@app.post("/api/funding/ask", response_model=FundingAssessment)
+def ask_funding(
+    request: AskRequest,
+    _user: AuthenticatedUser | None = Depends(require_api_user),
+) -> FundingAssessment:
+    """Assess the deterministic synthetic FO-2026-117 grant scenario."""
+    return assess_funding(settings, request.question)
+
+
+@app.post("/api/funding/ask/stream")
+async def ask_funding_stream(
+    request: AskRequest,
+    _user: AuthenticatedUser | None = Depends(require_api_user),
+) -> EventSourceResponse:
+    """Stream progress for the offline, synthetic funding assessment."""
+    async def events():
+        sources = [
+            ("foundry", "Funding notice and current amendment"),
+            ("fabric", "Grant operations and match records"),
+            ("work", "Proposal tasks and reviewer calendar"),
+            ("web", "Synthetic agency guidance snapshot"),
+        ]
+        yield {
+            "event": "plan",
+            "data": json.dumps({"steps": ["Check current notice and amendment", "Reconcile confirmed match and eligibility evidence", "Review proposal tasks and deadlines", "Prepare human-review assessment"]}),
+        }
+        for source, label in sources:
+            yield {
+                "event": "source_query",
+                "data": json.dumps({"source": source, "label": label, "query": request.question, "status": "searching"}),
+            }
+        source_states = {}
+        for source, label in sources:
+            source_states[Source(source)] = "complete"
+            yield {
+                "event": "source_result",
+                "data": json.dumps({"source": source, "status": "complete", "summary": "Retrieved synthetic funding evidence.", "citations": [], "durationMs": 0}),
+            }
+        result = assess_funding(settings, request.question, source_states=source_states)
+        yield {"event": "final", "data": json.dumps({"result": result.model_dump()})}
+
+    return EventSourceResponse(events())
+
+
+@app.post("/api/ask", response_model=AskResult, include_in_schema=False)
 def ask(
     request: AskRequest,
     user: AuthenticatedUser | None = Depends(require_api_user),
@@ -94,7 +145,7 @@ def ask(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@app.post("/api/ask/stream")
+@app.post("/api/ask/stream", include_in_schema=False)
 def ask_stream(
     request: AskRequest,
     user: AuthenticatedUser | None = Depends(require_api_user),
@@ -109,7 +160,7 @@ def ask_stream(
 # served from Fabric IQ directly once the graph is provisioned, not from this API.
 
 
-@app.get("/api/cohort/patients/{patient_id}/trials/{trial_id}/eligibility")
+@app.get("/api/cohort/patients/{patient_id}/trials/{trial_id}/eligibility", include_in_schema=False)
 def cohort_eligibility(
     patient_id: str,
     trial_id: str,
