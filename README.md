@@ -1,11 +1,37 @@
 # Award IQ
 
-Evidence-backed **grant eligibility and funding-readiness decision support**. Award IQ combines
-funding rules, structured operations, team evidence, and agency guidance into a cited assessment:
-are we eligible, should we pursue the opportunity, and what must happen next?
+Award IQ demonstrates **Microsoft IQ capabilities** through a practical question:
+
+> **What data makes your organization unique?**
+
+A general-purpose model can explain a grant's rules. It cannot know your organization's confirmed
+funding, local priorities, partner commitments, internal policies, reviewer availability, or latest
+team decisions without access to that evidence. Award IQ shows how bringing those sources together
+turns a generic answer into **organization-specific, evidence-backed decision support**.
+
+The demonstration uses **grant eligibility and funding readiness**: are we eligible, should we
+pursue this opportunity, and what must happen next? Funding is the example; the broader point is
+how an organization's own knowledge, operational records, and collaboration context improve an
+AI-assisted decision.
 
 All scenario records are synthetic. Recommendations and next actions require human approval.
 The application does not approve funds, create tasks, send mail, book meetings, or submit applications.
+
+## What each IQ contributes
+
+| Capability | The organization-specific evidence | Why it changes the answer |
+|---|---|---|
+| **Foundry IQ** | Institutional funding policies, program evidence, and current grant terms | Grounds the interpretation in the applicable rules and the organization's documented priorities, rather than generic advice |
+| **Fabric IQ** | Budgets, confirmed versus proposed match, eligibility records, and recorded decisions | Establishes what the organization can substantiate financially and operationally |
+| **Work IQ** | Proposal documents, review notes, partner discussions, and coordination evidence in Microsoft 365 | Adds who is responsible, what remains unresolved, and which dependencies affect the next step |
+
+For example, knowing that a grant requires a 25% match is not enough. Knowing that this organization
+has a **$450,000 unconfirmed gap**, needs a **current partner letter**, and must work around
+**reviewer availability** changes both the recommendation and the action sequence. Citations let
+the reviewer inspect the evidence behind that distinction.
+
+The connected implementation uses the source paths described below; the local walkthrough uses
+synthetic fixtures and does not call Microsoft IQ services.
 
 ## Scenarios
 
@@ -60,7 +86,8 @@ from `apps/web`.
 ## Connected setup is operator-assisted
 
 The supported infrastructure entry point is **`infra/funding.bicep`**, also selected by
-`infra/azure.yaml` and compiled in CI. Read [deployment prerequisites](docs/deployment.md)
+`infra/azure.yaml`. CI runs secret scanning only; run application and infrastructure checks locally.
+Read [deployment prerequisites](docs/deployment.md)
 before running any provisioning helper.
 
 Use a new Award IQ resource group, workspace, and lakehouse on an explicitly selected **existing
