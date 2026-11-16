@@ -2,18 +2,16 @@ name: award-iq
 metadata:
   template: award-iq-funding-readiness-poc
 
-# This azure.yaml is intentionally located under infra/ to honor the authoring
-# boundary for this task. Run azd from this directory:
+# Run azd from this directory after configuring the isolated funding lakehouse and Entra apps:
 #   cd infra
-#   azd up
-# Set AZURE_SUBSCRIPTION_ID and AZURE_RESOURCE_GROUP explicitly in the azd environment. Authentication
-# and live-resource coordinates are also supplied through that environment and consumed by
-# main.parameters.json. Bicep emits only public VITE_* values for the Static Web App build; the
-# confidential certificate is referenced from Key Vault and is never emitted as an output.
+#   azd up  # baseline only; optional intelligence/Work IQ inputs need explicit parameter bindings
+# Set AZURE_SUBSCRIPTION_ID and the new AZURE_RESOURCE_GROUP explicitly in the azd environment.
+# funding.parameters.json consumes the Fabric SQL and Entra configuration. Only public VITE_*
+# values are emitted for the browser build; runtime Fabric reads use managed identity.
 infra:
   provider: bicep
   path: .
-  module: main
+  module: funding
 
 # After provisioning, grant the app's managed identity Fabric workspace membership for live Fabric
 # IQ and Reader on the backing capacity for the UI status indicator. Workspace membership is a

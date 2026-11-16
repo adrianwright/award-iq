@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "tenantId": { "value": "${AZURE_TENANT_ID}" },
+    "fabricWorkspaceId": { "value": "${FABRIC_WORKSPACE_ID}" },
+    "fabricLakehouseId": { "value": "${FABRIC_LAKEHOUSE_ID}" },
+    "fabricSqlServer": { "value": "${FABRIC_SQL_SERVER}" },
+    "fabricSqlDatabase": { "value": "${FABRIC_SQL_DATABASE}" },
+    "fabricCapacityResourceGroup": { "value": "${FABRIC_CAPACITY_RESOURCE_GROUP}" },
+    "fabricCapacityName": { "value": "${FABRIC_CAPACITY_NAME}" },
+    "webClientId": { "value": "${WEB_CLIENT_ID}" },
+    "apiAudience": { "value": "${API_AUDIENCE}" },
+    "webApiScope": { "value": "${WEB_API_SCOPE}" }
+  }
+}

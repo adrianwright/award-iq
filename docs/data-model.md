@@ -30,4 +30,4 @@ keys, join paths, status meanings, and calculation basis are documented in
   funding award or submitted application. FO-2026-330 has a specifically evidenced failed geography
   criterion; other requirements are not inferred.
 
-The original clinical data model is not used by the Award IQ frontend or funding API.
+Only the funding data model is included.

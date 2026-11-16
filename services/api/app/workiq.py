@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 import logging
 from collections import Counter
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
@@ -66,6 +68,7 @@ class _AttributionDiagnostics:
     accepted_count: int
     reference_part_count: int
     invalid_url_count: int
+    malformed_count: int
     type_counts: tuple[tuple[str, int], ...]
 
 
@@ -76,6 +79,129 @@ class WorkIQAnswer:
     context_id: str | None
     duration_ms: int
     attributions: tuple[WorkIQAttribution, ...] = ()
+    rejected_attribution_count: int = 0
+
+
+@dataclass(frozen=True)
+class WorkIQDocument:
+    citation_id: str
+    markdown: str
+    url: str
+    sensitivity_label: dict[str, Any]
+    drive_id: str | None = None
+    item_id: str | None = None
+    title: str | None = None
+
+
+@dataclass(frozen=True)
+class WorkIQRetrieval:
+    documents: tuple[WorkIQDocument, ...]
+    duration_ms: int
+
+
+def _parse_retrieval(structured: dict[str, Any] | None, *, is_error: bool) -> tuple[WorkIQDocument, ...]:
+    payload = (structured or {}).get("application/vnd.ms-workiq.retrieval")
+    if not isinstance(payload, dict):
+        raise WorkIQProtocolError("Work IQ returned no structured retrieval payload.")
+    if is_error or payload.get("stoppedReason") != "completed":
+        code = payload.get("errorCode", payload.get("stoppedReason", "unknown"))
+        raise WorkIQProtocolError(f"Work IQ retrieval did not complete ({code}); no fallback was used.")
+    results = payload.get("results")
+    if not isinstance(results, list) or payload.get("resultCount") != len(results):
+        raise WorkIQProtocolError("Work IQ returned an invalid or partial retrieval result.")
+    documents: list[WorkIQDocument] = []
+    seen: set[str] = set()
+    for result in results:
+        if not isinstance(result, dict):
+            raise WorkIQProtocolError("Work IQ returned malformed source metadata.")
+        if result.get("contentProtection") != "allowed":
+            raise WorkIQProtocolError("Work IQ did not explicitly allow use of retrieved source content.")
+        citation_id = result.get("id")
+        markdown = result.get("markdown")
+        url = _validated_web_url(result.get("webUrl"))
+        label = result.get("sensitivityLabel", {})
+        if (
+            not isinstance(citation_id, str) or not citation_id or citation_id in seen
+            or not isinstance(markdown, str) or not markdown.strip() or url is None
+            or not isinstance(label, dict) or result.get("entityType") != "Files"
+        ):
+            raise WorkIQProtocolError("Work IQ returned an invalid or unidentifiable document.")
+        seen.add(citation_id)
+        drive_id = result.get("driveId")
+        item_id = result.get("itemId")
+        if any(value is not None and (not isinstance(value, str) or not value) for value in (drive_id, item_id)):
+            raise WorkIQProtocolError("Work IQ returned malformed drive/item identity metadata.")
+        metadata = result.get("resourceMetadata")
+        document_metadata = metadata.get("document") if isinstance(metadata, dict) else None
+        title = document_metadata.get("title") if isinstance(document_metadata, dict) else None
+        documents.append(WorkIQDocument(
+            citation_id, markdown, url, label, drive_id, item_id,
+            title if isinstance(title, str) else None,
+        ))
+    return tuple(documents)
+
+
+async def _retrieve_with_access_token(
+    settings: Settings, access_token: str, query: str, document_urls: list[str],
+) -> tuple[WorkIQDocument, ...]:
+    from jsonschema import validate
+    from jsonschema.exceptions import SchemaError, ValidationError
+    from mcp import ClientSession, McpError
+    from mcp.client.streamable_http import streamablehttp_client
+
+    arguments = {
+        "query": query,
+        "strategy": "grounding",
+        "capabilities": [{
+            "name": "OneDriveAndSharePoint",
+            "items_by_url": [{"url": url} for url in document_urls],
+        }],
+        "includeDeveloperCard": False,
+    }
+    try:
+        async with asyncio.timeout(settings.WORK_IQ_TIMEOUT_SECONDS):
+            async with streamablehttp_client(
+                settings.WORK_IQ_MCP_ENDPOINT,
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=settings.WORK_IQ_TIMEOUT_SECONDS,
+                sse_read_timeout=settings.WORK_IQ_TIMEOUT_SECONDS,
+            ) as (read, write, _):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    cursor = None
+                    for _ in range(10):
+                        listing = await session.list_tools(cursor=cursor)
+                        tool = next((tool for tool in listing.tools if tool.name == "retrieve"), None)
+                        if tool is not None:
+                            break
+                        cursor = listing.nextCursor
+                        if not cursor:
+                            raise WorkIQConfigurationError("Work IQ retrieve is unavailable for this tenant.")
+                    else:
+                        raise WorkIQConfigurationError("Work IQ tool discovery exceeded the supported page limit.")
+                    validate(arguments, tool.inputSchema)
+                    result = await session.call_tool(
+                        tool.name, arguments,
+                        read_timeout_seconds=timedelta(seconds=settings.WORK_IQ_TIMEOUT_SECONDS),
+                    )
+                    return _parse_retrieval(result.structuredContent, is_error=result.isError)
+    except (httpx.HTTPError, McpError, TimeoutError, SchemaError, ValidationError) as exc:
+        logger.warning("Work IQ structured retrieval failed: type=%s", type(exc).__name__)
+        raise WorkIQRequestError(
+            "Work IQ structured retrieval failed. Check MCP availability, consent and source access; "
+            "no alternate retrieval or fallback was attempted."
+        ) from exc
+    except ExceptionGroup as exc:
+        # MCP transports can wrap a typed service or protocol failure in a task-group exception.
+        failures = list(exc.exceptions)
+        while failures:
+            failure = failures.pop(0)
+            if isinstance(failure, WorkIQError):
+                raise failure from exc
+            if isinstance(failure, ExceptionGroup):
+                failures.extend(failure.exceptions)
+        logger.warning("Work IQ MCP transport failed: type=%s", type(exc).__name__)
+        raise WorkIQRequestError("Work IQ MCP transport failed; no fallback was attempted.") from exc
 
 
 def _create_obo_application(
@@ -160,31 +286,38 @@ def _string_or_none(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def _reference_items(value: Any) -> list[dict[str, Any]]:
+def _reference_items(value: Any) -> tuple[list[dict[str, Any]], int]:
     if isinstance(value, list):
-        return [item for item in value if isinstance(item, dict)]
+        items = [item for item in value if isinstance(item, dict)]
+        return items, len(value) - len(items) + (1 if not value else 0)
     if not isinstance(value, dict):
-        return []
+        return [], 1
     items: list[dict[str, Any]] = []
+    malformed_count = 0
+    has_nested = False
     for key in ("attributions", "citations", "references"):
         nested = value.get(key)
         if isinstance(nested, list):
+            has_nested = True
             items.extend(item for item in nested if isinstance(item, dict))
-    if items:
-        return items
-    return [value]
+            malformed_count += sum(not isinstance(item, dict) for item in nested)
+            malformed_count += 1 if not nested else 0
+    if has_nested:
+        return items, malformed_count
+    return [value], 0
 
 
 def _attribution_candidates(
     response: dict[str, Any],
-) -> tuple[list[_AttributionCandidate], int]:
+) -> tuple[list[_AttributionCandidate], int, int]:
     result = response.get("result")
     if not isinstance(result, dict):
-        return [], 0
+        return [], 0, 0
 
     candidates: list[_AttributionCandidate] = []
     seen_candidates: set[int] = set()
     reference_part_count = 0
+    malformed_count = 0
     for container in _walk_dicts(result):
         for part in _part_list(container):
             if not isinstance(part, dict):
@@ -195,7 +328,9 @@ def _attribution_candidates(
             if media_type != WORK_IQ_REFERENCE_MEDIA_TYPE:
                 continue
             reference_part_count += 1
-            for item in _reference_items(part.get("data")):
+            reference_items, malformed = _reference_items(part.get("data"))
+            malformed_count += malformed
+            for item in reference_items:
                 if id(item) not in seen_candidates:
                     candidates.append(
                         _AttributionCandidate(value=item, default_type="reference")
@@ -210,12 +345,14 @@ def _attribution_candidates(
             if not isinstance(raw_items, list):
                 continue
             for item in raw_items:
-                if isinstance(item, dict) and id(item) not in seen_candidates:
+                if not isinstance(item, dict):
+                    malformed_count += 1
+                elif id(item) not in seen_candidates:
                     candidates.append(
                         _AttributionCandidate(value=item, default_type=default_type)
                     )
                     seen_candidates.add(id(item))
-    return candidates, reference_part_count
+    return candidates, reference_part_count, malformed_count
 
 
 def _walk_dicts(value: Any) -> list[dict[str, Any]]:
@@ -233,7 +370,7 @@ def _walk_dicts(value: Any) -> list[dict[str, Any]]:
 def _extract_attributions(
     response: dict[str, Any],
 ) -> tuple[tuple[WorkIQAttribution, ...], _AttributionDiagnostics]:
-    candidates, reference_part_count = _attribution_candidates(response)
+    candidates, reference_part_count, malformed_count = _attribution_candidates(response)
     attributions: list[WorkIQAttribution] = []
     seen: set[tuple[str, str | None]] = set()
     invalid_url_count = 0
@@ -289,6 +426,7 @@ def _extract_attributions(
         accepted_count=len(attributions),
         reference_part_count=reference_part_count,
         invalid_url_count=invalid_url_count,
+        malformed_count=malformed_count,
         type_counts=tuple(sorted(type_counts.items())),
     )
     return tuple(attributions), diagnostics
@@ -345,7 +483,7 @@ class WorkIQClient:
             settings
         )
 
-    def ask(self, *, user_assertion: str, question: str) -> WorkIQAnswer:
+    def _access_token(self, user_assertion: str) -> str:
         if not user_assertion:
             raise WorkIQTokenExchangeError("A delegated user token is required for Work IQ")
 
@@ -363,6 +501,25 @@ class WorkIQClient:
             description = str(token_result.get("error_description", "OBO token exchange returned no access token"))
             logger.warning("Work IQ OBO failed: error=%s description=%s", error, description)
             raise WorkIQTokenExchangeError(f"Work IQ OBO failed ({error})")
+        return access_token
+
+    def retrieve(
+        self, *, user_assertion: str, query: str, document_urls: list[str],
+    ) -> WorkIQRetrieval:
+        access_token = self._access_token(user_assertion)
+        started = time.perf_counter()
+        documents = asyncio.run(
+            _retrieve_with_access_token(self.settings, access_token, query, document_urls)
+        )
+        duration_ms = round((time.perf_counter() - started) * 1000)
+        logger.info(
+            "Work IQ structured retrieval completed: documents=%d duration_ms=%d",
+            len(documents), duration_ms,
+        )
+        return WorkIQRetrieval(documents, duration_ms)
+
+    def ask(self, *, user_assertion: str, question: str) -> WorkIQAnswer:
+        access_token = self._access_token(user_assertion)
 
         return ask_with_access_token(
             access_token=access_token,
@@ -466,12 +623,13 @@ def ask_with_access_token(
     ) or "none"
     logger.info(
         "Work IQ attribution diagnostics: candidates=%d accepted=%d types=%s "
-        "reference_parts=%d invalid_urls=%d",
+        "reference_parts=%d invalid_urls=%d malformed=%d",
         attribution_diagnostics.candidate_count,
         attribution_diagnostics.accepted_count,
         type_summary,
         attribution_diagnostics.reference_part_count,
         attribution_diagnostics.invalid_url_count,
+        attribution_diagnostics.malformed_count,
     )
     logger.info(
         "Work IQ completed: task_id=%s attributions=%d duration_ms=%d",
@@ -485,4 +643,9 @@ def ask_with_access_token(
         context_id=context_id,
         duration_ms=duration_ms,
         attributions=attributions,
+        rejected_attribution_count=(
+            attribution_diagnostics.invalid_url_count
+            + attribution_diagnostics.malformed_count
+            + dict(attribution_diagnostics.type_counts).get("unsupported", 0)
+        ),
     )

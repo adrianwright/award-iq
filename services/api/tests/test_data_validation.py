@@ -1,41 +1,28 @@
 from __future__ import annotations
 
 import sys
-import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
 
-from data.fabric.generate import generate
-from tools.validate_consistency import _source_url_allowed
+from data.fabric.funding_ops.generate import generate
+from tools.validate_consistency import _source_url_allowed, validate_funding_ops, validate_synthetic_provenance
 
 
-def test_synthetic_source_urls_require_https() -> None:
-    trial_ids = {"NCT99004324"}
-
-    assert _source_url_allowed(
-        "https://amciq.example.invalid/foundry/protocol",
-        trial_ids,
-    )
-    assert _source_url_allowed(
-        "https://clinicaltrials.gov/study/NCT99004324",
-        trial_ids,
-    )
-    assert not _source_url_allowed(
-        "http://amciq.example.invalid/foundry/protocol",
-        trial_ids,
-    )
-    assert not _source_url_allowed(
-        "http://clinicaltrials.gov/study/NCT99004324",
-        trial_ids,
-    )
+def test_synthetic_source_urls_require_https_and_funding_host() -> None:
+    assert _source_url_allowed("https://award-iq.example.invalid/funding/notice")
+    assert not _source_url_allowed("http://award-iq.example.invalid/funding/notice")
+    assert not _source_url_allowed("https://award-iq.example.invalid.attacker.test/notice")
+    assert not _source_url_allowed("https://example.com/notice")
 
 
-def test_fabric_generator_uses_canonical_lf_endings() -> None:
-    with tempfile.TemporaryDirectory() as temp_dir:
-        output_dir = Path(temp_dir)
-        generate(output_dir)
+def test_funding_generator_uses_canonical_lf_endings(tmp_path: Path) -> None:
+    generate(tmp_path)
+    for path in tmp_path.glob("*.csv"):
+        assert b"\r\n" not in path.read_bytes()
 
-        for path in output_dir.glob("*.csv"):
-            assert b"\r\n" not in path.read_bytes()
+
+def test_funding_package_is_self_contained() -> None:
+    assert validate_funding_ops() == []
+    assert validate_synthetic_provenance() == []

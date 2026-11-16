@@ -17,20 +17,6 @@ export const sourceIcon: Record<IQSource, LucideIcon> = {
 
 export const sourceOrder: IQSource[] = ['foundry', 'fabric', 'work', 'web']
 
-export const sourceTagline: Record<IQSource, string> = {
-  foundry: 'Institutional knowledge',
-  fabric: 'Patient and operational data',
-  work: 'Care team and workflow',
-  web: 'External evidence',
-}
-
-export const sourceRetrieving: Record<IQSource, string> = {
-  foundry: 'Protocol criteria, genomics report, pathology, consent policy',
-  fabric: 'Patient registry, CrCl trend, ECOG, treatment history',
-  work: 'Open tasks, coordinator ownership, tumor board context',
-  web: 'External trial registry and biomarker treatment context',
-}
-
 export function sourceClass(source: IQSource): string {
   return `source-${source}`
 }
@@ -43,6 +29,7 @@ export const statusLabels: Record<SourceStatus, string> = {
   needs_review: 'Needs review',
   complete: 'Complete',
   failed: 'Failed',
+  skipped: 'Skipped',
 }
 
 export function statusLabel(status: SourceStatus): string {

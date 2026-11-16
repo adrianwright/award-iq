@@ -67,21 +67,67 @@ const result: FundingAssessment = {
 }
 
 describe('FundingAssessmentPanel', () => {
-  it('renders the grant decision, funding gap, owners, deadlines and draft boundary', () => {
+  it('leads with the decision and one action table, retaining details behind closed disclosures', () => {
     const markup = renderToStaticMarkup(<FundingAssessmentPanel result={result} />)
-    expect(markup).toContain('FO-2026-117')
-    expect(markup).toContain('$2,250,000')
-    expect(markup).toContain('$1,800,000')
-    expect(markup).toContain('$450,000')
-    expect(markup).toContain('TASK-117-PARTNER')
-    expect(markup).toContain('Maria Santos')
-    expect(markup).toContain('Jordan Lee')
+    const visible = markup.replace(/<details\b[\s\S]*?<\/details>/g, '')
+    expect(visible).toContain('Pursue - pending; resolve the match and partner conditions.')
+    expect(visible).toContain('Current grant scenario.')
+    expect(visible).toContain('$2,250,000')
+    expect(visible).toContain('$1,800,000')
+    expect(visible).toContain('$450,000')
+    expect(visible).toContain('Maria Santos')
+    expect(visible).toContain('Nov 18, 2026')
+    expect(visible).toContain('Not submitted')
+    expect(visible).toContain('Nothing booked or submitted')
+    expect(visible).toContain('Regional partner letter')
+    expect(visible).toContain('Confirm portal-specific attachments')
+    expect(visible).not.toContain('Continue conditionally.')
+    expect(visible).not.toContain('Program and community alignment.')
+    expect(visible).not.toContain('Confirm then document the source.')
+    expect(markup.match(/<table>/g)).toHaveLength(1)
+    expect(markup).not.toMatch(/<details[^>]*\bopen(?:=|\s|>)/)
+    expect(markup).not.toContain('TASK-117-PARTNER')
     expect(markup).toContain('America/New_York (EST, UTC-05:00)')
-    expect(markup).toContain('Drafted (not submitted)')
-    expect(markup).toContain('Not submitted')
-    expect(markup).toContain('DOC-AMD2')
-    expect(markup).toContain('Why conditional pursuit may be worthwhile')
-    expect(markup).toContain('Ordered readiness path')
-    expect(markup).toContain('Confirm portal-specific attachments')
+    expect(markup).toContain('Confirm then document the source.')
+    expect(markup).not.toContain('Synthetic program evidence')
+    expect(visible.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).length).toBeLessThan(400)
+  })
+
+  it('renders generated narrative with numbered source links, not document IDs or raw retrieval', () => {
+    const markup = renderToStaticMarkup(<FundingAssessmentPanel result={{
+      ...result,
+      answer: 'The current amendment requires a partner letter [DOC-AMD2].\n\nCoordination remains open [DOC-PARTNER].',
+      rationale: [{ heading: 'Live Work IQ coordination context', text: '{"author":"private@example.com"}', evidenceRefs: ['DOC-PARTNER'] }],
+    }} />)
+    expect(markup).toContain('Source 1: Amendment 2')
+    expect(markup).toContain('Source 4: Partner note')
+    expect(markup).toContain('[1]</a>')
+    expect(markup).toContain('[4]</a>')
+    expect(markup).toContain('href="/api/evidence/doc?path=work/partner.md"')
+    expect(markup).not.toContain('DOC-AMD2')
+    expect(markup).not.toContain('Live Work IQ coordination context')
+    expect(markup).not.toContain('private@example.com')
+    expect(markup).not.toContain('Proposal workflow')
+  })
+
+  it('keeps failed eligibility visible and uses the selected opportunity rather than a canned pursuit answer', () => {
+    const markup = renderToStaticMarkup(<FundingAssessmentPanel result={{
+      ...result,
+      pursuitStatus: 'Do not pursue',
+      eligibility: 'Not eligible',
+      bottomLine: 'The applicant type is not eligible.',
+      answer: 'Do not pursue: the applicant type fails the current rule. Match gap is $0 [DOC-AMD2].',
+      matchGap: 0,
+      criteria: [{ id: 'applicant-type', text: 'Public-sector applicant required', status: 'not_met', evidenceRefs: ['DOC-AMD2'] }],
+      criticalPath: [{ ...result.criticalPath[0], title: 'Review the failed criterion', owner: null, due: null }],
+    }} />)
+    const visible = markup.replace(/<details\b[\s\S]*?<\/details>/g, '')
+    expect(visible).toContain('Not met')
+    expect(visible).toContain('Public-sector applicant required')
+    expect(visible).toContain('Review the failed criterion')
+    expect(visible).toContain('Not assigned')
+    expect(visible).toContain('Not set')
+    expect(visible).not.toContain('Pursue - pending')
+    expect(visible).not.toContain('Confirm match')
   })
 })

@@ -1,1 +1,1 @@
-"""AMC IQ FastAPI backend."""
+"""Award IQ FastAPI backend."""

@@ -2,43 +2,28 @@
 
 ## Decision
 
-For this proof of concept, AMC IQ uses two single-tenant Microsoft Entra applications:
+Award IQ uses separate single-tenant SPA and API Entra registrations. MSAL React acquires the API's
+delegated scope; the API validates issuer, signature, tenant, audience, expiry and scope.
+The backend exchanges the user's assertion through certificate-backed OBO for Work IQ access.
 
-- `amciq-web-client` is the React/Vite SPA public client. MSAL React acquires the delegated AMC IQ
-  API scope and direct cross-origin `fetch` requests attach the access token to both JSON and POST
-  SSE calls.
-- `amciq-workiq-client` is the confidential FastAPI client and API. The API validates the token
-  tenant, exact audience, signature, lifetime, and delegated scope before accepting assessment or
-  cohort requests. For each assessment it performs a stateless OBO exchange for Work IQ and sends
-  an A2A v1.0 `SendMessage` request to `https://workiq.svc.cloud.microsoft/a2a/`.
+Production uses managed identity to read the exportable certificate's PFX secret from Key Vault.
+The certificate is converted to MSAL's PEM representation and briefly cached. Refresh failures use
+the last known certificate with retry backoff; there is no client-secret fallback. IDs, certificate
+names, vault URI and scopes are operator settings, not committed credentials.
 
-In production the backend uses its user-assigned managed identity and `SecretClient` to retrieve the
-base64 PFX secret backing the exportable `amciq-workiq-obo` certificate in `amciq-core-kv`. The PFX
-is converted to the PEM key and certificate shape required by MSAL and cached briefly in process.
-The default five-minute refresh interval picks up Key Vault certificate rotation without requiring an
-application restart. A transient refresh failure serves the last-known-good certificate and applies a
-short retry backoff, preventing concurrent assessments from overwhelming Key Vault. The OBO token
-exchange remains stateless per assessment. Client IDs, audiences, scopes, vault URI, and certificate
-name are environment inputs. No generated IDs, credentials, or client-secret fallback are committed.
+| Route | Policy |
+|---|---|
+| `POST /api/funding/ask` and `/api/funding/ask/stream` | Authenticated except explicit offline local/test mode |
+| `POST /api/workiq/check` | Signed-in user required, including local mode |
+| `GET /healthz`, `/api/fabric/status` | Public, bounded operational metadata |
+| `GET /api/evidence/doc` | Public, allowlisted packaged synthetic documents only |
 
-## Least-privilege route policy
-
-| Route | Authentication | Rationale |
-|---|---|---|
-| `POST /api/ask` | Required | Runs an assessment and can invoke delegated Work IQ. |
-| `POST /api/ask/stream` | Required | Same data and delegated operations as the JSON assessment. |
-| `GET /api/cohort/.../eligibility` | Required | Exposes patient and trial cohort assessment data. |
-| `GET /healthz` | Public | Contains only process health and mock or live mode; required for platform probes. |
-| `GET /api/fabric/status` | Public | Returns only capacity state, name, and a portal link; it never returns tenant data or credentials. |
-| `GET /api/evidence/doc` | Public, allowlisted synthetic files only | Citation links open in a browser without token propagation. The handler permits only synthetic `data/foundry_docs` and `data/work` files and rejects traversal. |
-
-Delegated bearer tokens are used instead of cookies, so CORS permits only configured origins, `GET` and `POST`,
-plus the `Accept`, `Authorization`, and `Content-Type` headers. Credentialed cross-origin cookies are disabled.
+Funding evidence uses scoped Work IQ MCP retrieval. The diagnostic acknowledgment uses A2A but
+does not prove document access. An explicit notice diagnostic runs the normal assessment with Work IQ
+enabled for that request only. Failed source access stops the assessment, with no fixture fallback.
 
 ## Consequences
 
-- An assessment cannot run until the SPA and backend application registrations, delegated consent,
-  and Key Vault certificate secret exist.
-- Health probes and synthetic citation links remain usable without authentication.
-- Work IQ failures are typed and degrade through the existing per-source fallback while remaining
-  visible as a failed Work IQ source.
+Consent, certificate registration, Key Vault permissions, user billing and document indexing are manual
+prerequisites. The delegated permission is broader than this app's read-only use; administrators must
+approve it knowingly. See [deployment](../deployment.md) for source matching limitations and setup.

@@ -18,9 +18,6 @@ Amendment 2 requires $2.25M match; the $1.8M confirmed capital-plan allocation l
 The proposed reserve is excluded until Finance confirmation. The RTA's 2024 letter is a historical
 lead, not a current commitment.
 
-The clinical corpus and generator are retained for source-history compatibility only; they do not
-feed the Award IQ UI or `/api/funding/*` routes.
-
 Regenerate funding tables and validate consistency:
 
 ```bash

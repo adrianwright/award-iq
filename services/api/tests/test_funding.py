@@ -11,6 +11,19 @@ from app.config import get_settings
 from app.funding import assess_funding
 from app.main import app
 
+
+def test_removed_routes_and_documents_are_not_exposed() -> None:
+    client = TestClient(app)
+    assert client.post("/api/ask", json={"question": "FO-2026-117"}).status_code == 404
+    assert client.post("/api/ask/stream", json={"question": "FO-2026-117"}).status_code == 404
+    assert client.get("/api/cohort/patients/PT-1042/trials/NCT99004324/eligibility").status_code == 404
+    assert client.get("/api/evidence/doc", params={
+        "path": "foundry_docs/protocol_NCT99004324.md",
+    }).status_code == 404
+    paths = client.get("/openapi.json").json()["paths"]
+    assert "/api/funding/ask" in paths
+    assert not any(path.startswith(("/api/ask", "/api/cohort")) for path in paths)
+
 NOTICE_ID = "FO-2026-117"
 QUESTION = (
     "A new infrastructure and community-resilience grant closes in 30 days. Amendment 2 raises "

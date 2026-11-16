@@ -14,6 +14,32 @@ artifacts/private/
 *.local
 .azure/
 azd.env
+*.key
+*.pem
+*.pfx
+*.p12
+# Operator credentials and local deployment artifacts (not source JSON or safe examples)
+.credentials/
+.msal/
+.swa/
+msal_cache*
+msal_token_cache*
+.msal_cache*
+.token_cache*
+*.msalcache
+token_cache.*
+accessTokens.json
+azureProfile.json
+deployment-output*.json
+deployment-parameters.local.json
+funding-document-identities.local.json
+infra/funding.json
+infra/modules/apps.json
+infra/modules/funding-knowledge.json
+infra/modules/identity.json
+infra/modules/observability.json
+infra/modules/foundry-role.json
+infra/modules/search-role.json
 
 # Python
 __pycache__/

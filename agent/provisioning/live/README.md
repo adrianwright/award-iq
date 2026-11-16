@@ -1,19 +1,19 @@
-# Optional Fabric funding data load
+# Award IQ operator helpers
 
-The local Award IQ application does not need Azure credentials or any resource provisioning.
-`load_fabric_lakehouse.py` and `provision_fabric_data_agent.ps1` now target the synthetic grant
-tables under `data/fabric/funding_ops/`. They require operator-supplied workspace, Lakehouse,
-Data Agent, and token values; neither is run by the local launcher.
+These are explicit operator actions, not a complete bootstrap or part of the local walkthrough.
+See [deployment prerequisites](../../../docs/deployment.md) before running them.
 
-The suggested resource slugs are `award-iq-fabric-funding-agent` and
-`award_iq_fabric_funding_ops`. The funding ontology contract is
-`data/ontology/funding_ontology.yaml`.
+| Helper | Scope |
+|---|---|
+| `load_fabric_lakehouse.py` | Loads 16 runtime funding tables into a new empty isolated lakehouse. Refuses existing tables and source files; never overwrites. |
+| `provision_funding_knowledge.py` | Creates funding-only Search index, knowledge source and base using explicit endpoints. Refuses existing resources. |
+| `inspect_funding_work_documents.py` | Read-only M365 metadata/identity inspection with an explicitly consented setup client and encrypted local token cache. |
+| `grant_app_identity_fabric.ps1` | Grants the new API identity workspace Viewer and read-only capacity status access, using explicit resource coordinates. |
+| `deploy_web.ps1` | Builds and deploys to an explicitly selected Static Web App after Entra and API configuration. |
 
-**Do not run `provision_all.ps1` or the remaining Foundry/Work IQ scripts as an Award IQ deployment.**
-Those source-project provisioning scripts still contain clinical-domain assumptions and are not an
-implemented live Award IQ stack. They do not provision resources automatically. A connected
-deployment must first adapt and review the relevant Foundry knowledge-base, ontology, Work IQ, auth,
-and security configuration for funding data.
+The funding runtime reads Fabric SQL directly; no Fabric Data Agent or specialist-agent deployment
+is required. Old clinical provisioning, M365 seeding and teardown scripts are removed.
 
-The grant fixture collection remains synthetic. Uploading it is a separate, explicit operator
-action; this repository never seeds a tenant or provisions cloud resources automatically.
+Supply Entra registrations/consent, certificate/Key Vault access, Fabric workspace/lakehouse and
+SQL permissions, knowledge indexing, and synthetic M365 documents separately. Reuse only the
+selected capacity, not another demo's workspace or data. No helper runs automatically in local mode.

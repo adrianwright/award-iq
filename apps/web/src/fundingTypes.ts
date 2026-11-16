@@ -71,6 +71,9 @@ export interface FundingAssessment {
   }>
   trace: TraceStep[]
   mode: 'mock' | 'live'
+  knowledgeMode?: 'packaged' | 'foundry_iq'
+  workMode?: 'packaged' | 'work_iq'
+  narrativeModel?: string | null
   disclaimer: string
 }
 
@@ -79,4 +82,6 @@ export type FundingSourceProgress = {
   label?: string
   status?: SourceStatus
   summary?: string
+  citations?: string[]
+  durationMs?: number
 }

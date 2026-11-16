@@ -16,7 +16,7 @@ Include in your report:
   or other concern.
 - Any suggested mitigations or patches if you have them.
 
-Please do not include live credentials, real patient data, or PHI in a vulnerability report.
+Please do not include live credentials, real applicant data, or private funding records in a vulnerability report.
 
 ## Supported versions
 

@@ -2,21 +2,36 @@ from __future__ import annotations
 
 import csv
 import re
+import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeVar
 from zoneinfo import ZoneInfo
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.config import Settings
 from app.schemas import Evidence, Source
 from app.sources.base import evidence_doc_url
+from app.sources.fabric_funding import FUNDING_TABLES, FundingDataUnavailable, read_funding_tables
+from app.sources.foundry_funding import FundingKnowledge, retrieve_funding_knowledge, synthesize_funding_answer
+from app.sources.work_funding import FundingWork, retrieve_funding_work
 
 
 CriterionStatus = Literal["met", "not_met", "unknown"]
+_SourceResult = TypeVar("_SourceResult")
+
+
+class FundingSourceProgress(BaseModel):
+    source: Source
+    status: Literal["searching", "retrieved", "needs_review", "failed"]
+    citations: list[str] = Field(default_factory=list)
+    summary: str = ""
+    durationMs: int = 0
 
 
 class FundingPerson(BaseModel):
@@ -92,6 +107,7 @@ class FundingAssessment(BaseModel):
     deadlineDays: int
     criteria: list[FundingCriterion]
     rationale: list[FundingRationale]
+    retrievalContext: list[FundingRationale] = Field(default_factory=list, exclude=True)
     partner: str
     partnerEvidence: str
     tasks: list[FundingTask]
@@ -105,6 +121,9 @@ class FundingAssessment(BaseModel):
     sourceMap: list[dict[str, object]]
     trace: list[dict[str, object]]
     mode: Literal["mock", "live"] = "mock"
+    knowledgeMode: Literal["packaged", "foundry_iq"] = "packaged"
+    workMode: Literal["packaged", "work_iq"] = "packaged"
+    narrativeModel: str | None = None
     disclaimer: str = (
         "Synthetic grant decision support. Human review required. No funds approved, tasks "
         "submitted, meetings booked, or applications submitted."
@@ -166,6 +185,8 @@ def _citation(
         Source.WORK: "work",
         Source.WEB: "web",
     }[source]
+    if not re.fullmatch(r"[A-Za-z0-9._-]+\.(md|json)", document["filename"]):
+        raise FundingDataUnavailable("Funding evidence contains an invalid document filename.")
     path = data_dir / directory / document["filename"]
     text = path.read_text(encoding="utf-8")
     snippet = " ".join(text.split())[:300]
@@ -224,31 +245,32 @@ def assess_funding(
     question: str,
     *,
     source_states: dict[Source, str] | None = None,
+    user_access_token: str | None = None,
+    on_progress: Callable[[FundingSourceProgress], None] | None = None,
 ) -> FundingAssessment:
-    """Build a deterministic, data-linked funding assessment from synthetic source records."""
+    """Reconcile funding facts, optionally grounding and narrating them through live Foundry."""
+    def report(
+        source: Source, status: Literal["searching", "retrieved", "needs_review", "failed"],
+        refs: list[str] | None = None, duration_ms: int = 0,
+    ) -> None:
+        if on_progress:
+            on_progress(FundingSourceProgress(
+                source=source, status=status, citations=refs or [], durationMs=duration_ms,
+                summary=(
+                    "Source retrieval failed." if status == "failed"
+                    else f"Retrieved {len(refs or [])} evidence source(s)." if status != "searching"
+                    else ""
+                ),
+            ))
+
     data_dir = settings.DATA_DIR
     with (data_dir / "registry" / "funding_registry.yaml").open(encoding="utf-8") as handle:
         registry = yaml.safe_load(handle)
-    all_rows = {
+    started = time.perf_counter()
+    report(Source.FABRIC, "searching")
+    all_rows = read_funding_tables(settings) if settings.USE_LIVE_FABRIC else {
         name: _read_rows(data_dir, name)
-        for name in (
-            "funding_opportunities",
-            "amendments",
-            "eligibility_criteria",
-            "budget_lines",
-            "match_sources",
-            "partners",
-            "people",
-            "prior_proposals",
-            "program_performance",
-            "community_metrics",
-            "staff_workload",
-            "scheduling_slots",
-            "approvals",
-            "submissions",
-            "proposal_tasks",
-            "source_documents",
-        )
+        for name in FUNDING_TABLES
     }
     opportunities = all_rows["funding_opportunities"]
     scenario_date = date.fromisoformat(registry["meta"]["scenario_as_of"])
@@ -375,12 +397,85 @@ def assess_funding(
         and row["document_id"] not in superseded_document_ids
     }
     selected_docs.intersection_update(active_document_ids)
+    def retrieve_packaged(source: Source) -> list[Evidence]:
+        refs = sorted(
+            document_id for document_id in selected_docs
+            if documents[document_id]["source"] == source.value
+        )
+        return [_citation(data_dir, documents[document_id]) for document_id in refs]
 
-    evidence = [
-        _citation(data_dir, documents[document_id])
-        for document_id in sorted(selected_docs)
-        if document_id in documents
-    ]
+    fabric_evidence = retrieve_packaged(Source.FABRIC)
+    fabric_refs = [item.refId for item in fabric_evidence]
+    report(Source.FABRIC, "retrieved", fabric_refs, round((time.perf_counter() - started) * 1000))
+
+    def load_source(
+        source: Source, load: Callable[[], tuple[_SourceResult, list[Evidence]]],
+    ) -> tuple[_SourceResult, list[Evidence]]:
+        stage_started = time.perf_counter()
+        report(source, "searching")
+        try:
+            result, citations = load()
+        except FundingDataUnavailable:
+            report(source, "failed")
+            raise
+        refs = sorted({item.refId for item in citations})
+        report(
+            source, "retrieved" if refs else "needs_review", refs,
+            round((time.perf_counter() - stage_started) * 1000),
+        )
+        return result, citations
+
+    def load_foundry() -> tuple[FundingKnowledge | None, list[Evidence]]:
+        if not settings.USE_LIVE_FOUNDRY:
+            return None, retrieve_packaged(Source.FOUNDRY)
+        result = retrieve_funding_knowledge(
+            settings, question=query, notice_id=notice_id, as_of=scenario_date,
+            documents={
+                document_id: documents[document_id] for document_id in selected_docs
+                if documents[document_id]["source"] == Source.FOUNDRY.value
+            },
+            controlling_document_id=amendment["source_document_id"],
+        )
+        return result, result.citations
+
+    def load_work() -> tuple[FundingWork | None, list[Evidence]]:
+        if not settings.USE_LIVE_WORK:
+            return None, retrieve_packaged(Source.WORK)
+        result = retrieve_funding_work(
+            settings, user_access_token=user_access_token, question=query, notice_id=notice_id,
+            documents={
+                document_id: documents[document_id] for document_id in selected_docs
+                if documents[document_id]["source"] == Source.WORK.value
+            },
+        )
+        return result, result.citations
+
+    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="funding-source") as executor:
+        foundry_future = executor.submit(load_source, Source.FOUNDRY, load_foundry)
+        work_future = executor.submit(load_source, Source.WORK, load_work)
+        web_future = executor.submit(
+            load_source, Source.WEB, lambda: (None, retrieve_packaged(Source.WEB)),
+        )
+        knowledge, foundry_evidence = foundry_future.result()
+        work, work_evidence = work_future.result()
+        _, web_evidence = web_future.result()
+    evidence = sorted(
+        [*fabric_evidence, *foundry_evidence, *work_evidence, *web_evidence],
+        key=lambda item: item.refId,
+    )
+    selected_docs = {item.refId for item in evidence}
+    if settings.USE_LIVE_FABRIC:
+        for item in evidence:
+            if item.source == Source.FABRIC:
+                item.url = (
+                    f"{settings.fabric_portal_url}/lakehouses/{settings.FABRIC_LAKEHOUSE_ID}"
+                )
+                item.sourceType = f"Live Fabric SQL / synthetic records; {item.sourceType}"
+                item.snippet = (
+                    f"{notice_id}: eligible costs ${eligible_cost:,}; confirmed match "
+                    f"${confirmed_match:,}; proposed ${proposed_match:,}; gap ${match_gap:,}. "
+                    "Read from the isolated funding lakehouse for this assessment."
+                )
     evidence_by_id = {item.refId: item for item in evidence}
     criteria: list[FundingCriterion] = []
     for row in criteria_rows:
@@ -735,6 +830,31 @@ def assess_funding(
         ),
         evidenceRefs=sorted(set(decision_refs + executive_refs + legal_refs + submission_refs)),
     ))
+    retrieval_context: list[FundingRationale] = []
+    if knowledge:
+        retrieval_context.append(FundingRationale(
+            heading="Live Foundry IQ grant interpretation",
+            text=knowledge.answer,
+            evidenceRefs=[item.refId for item in knowledge.citations],
+        ))
+    if work:
+        retrieval_context.append(FundingRationale(
+            heading="Live Work IQ coordination context",
+            text=work.answer,
+            evidenceRefs=[item.refId for item in work.citations],
+        ))
+
+    # Unretrieved documents cannot support a live citation. The rule ledger remains in Fabric.
+    fabric_refs = [item.refId for item in evidence if item.source == Source.FABRIC]
+    for item in [*criteria, *rationale, *tasks, *critical_path]:
+        missing_rule = any(
+            ref in documents and documents[ref]["source"] == Source.FOUNDRY.value
+            and ref not in evidence_by_id for ref in item.evidenceRefs
+        )
+        item.evidenceRefs = sorted({
+            *(ref for ref in item.evidenceRefs if ref in evidence_by_id),
+            *(fabric_refs if missing_rule and settings.USE_LIVE_FABRIC else []),
+        })
 
     match_required_line = f"${required_match:,} required against ${eligible_cost:,} eligible costs"
     eligibility_answer = " ".join(
@@ -791,6 +911,14 @@ def assess_funding(
         Source.WORK: "Proposal tasks, human reviews, messages and staff schedules",
         Source.WEB: "Locally cached synthetic agency guidance; not a live web result",
     }
+    if settings.USE_LIVE_FABRIC:
+        source_descriptions[Source.FABRIC] = "Live Fabric SQL funding tables (synthetic seeded records)"
+        source_descriptions[Source.FOUNDRY] = "Packaged synthetic funding documents; not live Foundry"
+        source_descriptions[Source.WORK] = "Synthetic workflow records in Fabric; not live M365"
+    if knowledge:
+        source_descriptions[Source.FOUNDRY] = "Live Foundry IQ agentic retrieval over indexed synthetic funding documents"
+    if work:
+        source_descriptions[Source.WORK] = "Live delegated Work IQ over attributed synthetic M365 documents"
     source_map = []
     for source in Source:
         refs = [
@@ -808,10 +936,26 @@ def assess_funding(
             "evidenceCount": len(refs),
             "evidenceNoun": "sources",
             "summary": (
-                f"Retrieved {len(refs)} synthetic, versioned evidence item(s)."
+                (
+                    f"Read live Fabric SQL tables; {len(refs)} synthetic evidence item(s)."
+                    if settings.USE_LIVE_FABRIC and source == Source.FABRIC
+                    else f"Retrieved {len(refs)} synthetic, versioned evidence item(s)."
+                )
                 if refs else "No synthetic evidence is available for this source and opportunity."
             ),
         })
+        if source == Source.FOUNDRY and knowledge:
+            source_map[-1].update({
+                "queries": [knowledge.query],
+                "durationMs": knowledge.duration_ms,
+                "summary": knowledge.answer,
+            })
+        if source == Source.WORK and work:
+            source_map[-1].update({
+                "queries": [work.query],
+                "durationMs": work.duration_ms,
+                "summary": work.answer,
+            })
 
     unresolved = [item for item in criteria if item.status == "unknown"]
     missed = [item for item in criteria if item.status == "not_met"]
@@ -829,7 +973,18 @@ def assess_funding(
         {"step": "Reviewed program fit, decision, and critical path", "source": "work", "detail": f"Preserved the dated human status {current_status}; derived readiness steps from linked task, review, and schedule records.", "ts": 3, "status": "completed"},
         {"step": "Prepared human-review assessment", "detail": "No approval, meeting booking, notification, task submission, or application submission was performed.", "ts": 4, "status": "completed"},
     ]
-    return FundingAssessment(
+    if knowledge:
+        trace[1]["detail"] = (
+            f"Queried {settings.FOUNDRY_KB_NAME}; retrieved {len(knowledge.citations)} "
+            f"current funding documents in {knowledge.duration_ms} ms. "
+            f"Amendment {amendment['version']} governs as of {scenario_date}."
+        )
+    if work:
+        trace[3]["detail"] = (
+            f"Work IQ returned {len(work.citations)} attributed synthetic M365 documents "
+            f"in {work.duration_ms} ms; structured status and critical path remain authoritative."
+        )
+    assessment = FundingAssessment(
         question=query,
         answer=summary,
         bottomLine=bottom_line,
@@ -880,4 +1035,25 @@ def assess_funding(
         answerRefs=answer_refs,
         sourceMap=source_map,
         trace=trace,
+        mode="live" if settings.USE_LIVE_FABRIC else "mock",
+        knowledgeMode="foundry_iq" if knowledge else "packaged",
+        workMode="work_iq" if work else "packaged",
+        retrievalContext=retrieval_context,
     )
+    if settings.USE_LIVE_FUNDING_LLM:
+        narrative, model, duration_ms = synthesize_funding_answer(settings, assessment)
+        assessment.answer = narrative.answer
+        assessment.bottomLine = narrative.bottomLine
+        assessment.answerRefs = narrative.evidenceRefs
+        assessment.narrativeModel = model
+        assessment.trace.append({
+            "step": "Synthesized the assessment with a live LLM",
+            "source": "foundry",
+            "detail": (
+                f"{model} via {settings.MODEL_DEPLOYMENT}; {duration_ms} ms. "
+                "Narrated cited evidence; structured arithmetic and recorded status were preserved."
+            ),
+            "ts": 5,
+            "status": "completed",
+        })
+    return assessment

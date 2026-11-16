@@ -30,5 +30,6 @@ Funding evidence/document IDs (for example `FO-2026-117`, `TASK-117-PARTNER`, an
 in the cited fixture's front matter and response metadata. External evidence is a local synthetic
 snapshot, never a claim of a live agency connection.
 
-The earlier `/api/ask` and cohort routes remain for source-history compatibility and are not used by
-the Award IQ application.
+`POST /api/workiq/check` requires a signed-in user and checks delegated Work IQ connectivity.
+An optional allowlisted `notice_id` runs a live Work IQ assessment for that notice only.
+The old `/api/ask` and cohort routes are removed and return 404.

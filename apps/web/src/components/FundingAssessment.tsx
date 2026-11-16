@@ -1,125 +1,131 @@
 import { resolveApiUrl } from '../api/client'
 import type { FundingAssessment } from '../fundingTypes'
+import './FundingAssessment.css'
 
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+const sourceNames = { foundry: 'Funding documents', fabric: 'Funding records', work: 'Team documents', web: 'External guidance' }
+const date = (value: string) => new Date(`${value}T12:00:00Z`).toLocaleDateString('en-US', {
+  month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+})
 
 export function FundingAssessmentPanel({ result }: { result: FundingAssessment }) {
-  const evidenceById = new Map(result.evidence.map((item) => [item.refId, item]))
-  const citations = (refs: string[]) => refs.map((ref) => {
+  const evidenceById = new Map(result.evidence.map((item, index) => [item.refId, { ...item, number: index + 1 }]))
+  const citations = (refs: string[]) => [...new Set(refs)].map((ref) => {
     const evidence = evidenceById.get(ref)
     return evidence ? (
-      <a key={ref} href={resolveApiUrl(evidence.url)} title={`${evidence.title}: ${evidence.snippet}`}>{ref}</a>
+      <a key={ref} href={resolveApiUrl(evidence.url)} title={evidence.title}
+        aria-label={`Source ${evidence.number}: ${evidence.title}`} target="_blank" rel="noopener noreferrer">
+        [{evidence.number}]
+      </a>
     ) : null
   })
+  const citedText = (text: string) => text.split(/(\[DOC-[^\]]+\])/g).map((part, index) =>
+    /^\[DOC-[^\]]+\]$/.test(part)
+      ? <sup className="assessment-citations" key={index}>{citations([part.slice(1, -1)])}</sup>
+      : part,
+  )
+  const steps = [...result.criticalPath].sort((a, b) => a.order - b.order)
+  const stepTitle = (step: FundingAssessment['criticalPath'][number]) =>
+    step.title.startsWith(`${step.id}: `) ? step.title.slice(step.id.length + 2) : step.title
+  const unresolved = result.criteria.filter((criterion) => criterion.status !== 'met')
+
   return (
-    <div className="funding-results">
-      <section className="funding-card">
-        <p className="funding-eyebrow">Funding opportunity · as of {result.opportunity.asOfDate}</p>
-        <h2>{result.opportunity.title}</h2>
-        <p>{result.opportunity.id} · {result.opportunity.agency} · closes {result.opportunity.deadline} {result.opportunity.deadlineTimezone} ({result.deadlineDays} days)</p>
-        <div className="funding-status">
+    <div className="funding-results assessment">
+      <section className="assessment-card assessment-summary" aria-labelledby="assessment-title">
+        <p className="assessment-eyebrow">{result.opportunity.id} · As of {date(result.opportunity.asOfDate)}</p>
+        <h2 id="assessment-title">{result.opportunity.title}</h2>
+        <div className="assessment-status">
           <strong>{result.pursuitStatus}</strong>
           <span>{result.eligibility}</span>
         </div>
-        <p>{result.answer}</p>
-        <p className="funding-citations">{citations(result.answerRefs)}</p>
-        <p>{result.bottomLine}</p>
-        <p><strong>Recommendation:</strong> {result.recommendation}</p>
-        <p className="funding-caution">Recommendation is decision support only. A human funding decision is still required.</p>
-      </section>
-
-      <section className="funding-card">
-        <h3>Eligibility and amendment impact</h3>
-        <ul className="funding-list">
-          {result.criteria.map((criterion) => (
-            <li key={criterion.id}>
-              <span className={`funding-pill ${criterion.status}`}>{criterion.status.replace('_', ' ')}</span>
-              <span>{criterion.text}</span>
-              <span className="funding-citations">{citations(criterion.evidenceRefs)}</span>
-            </li>
-          ))}
-        </ul>
-        <p>{result.amendmentSummary}</p>
-      </section>
-
-      <section className="funding-card">
-        <h3>Match readiness</h3>
-        <p>{result.matchBasis}</p>
-        <div className="funding-amounts">
-          <div><span>Required</span><strong>{money.format(result.matchRequired)}</strong></div>
-          <div><span>Confirmed</span><strong>{money.format(result.matchConfirmed)}</strong></div>
-          <div><span>Gap</span><strong className="funding-gap">{money.format(result.matchGap)}</strong></div>
+        <p className="assessment-takeaway">{citedText(result.bottomLine)}</p>
+        <div className="assessment-answer">
+          {result.answer.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) =>
+            <p key={index}>{citedText(paragraph)}</p>,
+          )}
         </div>
-        <p>Eligible project-cost basis: {money.format(result.opportunity.eligibleCostBasis)} · requested grant share: {money.format(result.opportunity.requestedAmount)}</p>
-        <p>Proposed (not counted): {money.format(result.matchProposed)}. Confirmed funds only reduce the gap.</p>
+        {!/\[DOC-[^\]]+\]/.test(result.answer + result.bottomLine) &&
+          <p className="assessment-citations">Sources {citations(result.answerRefs)}</p>}
+        <dl className="assessment-facts">
+          <div><dt>Unconfirmed match</dt><dd>{money.format(result.matchGap)}</dd>
+            <small>{money.format(result.matchConfirmed)} confirmed / {money.format(result.matchRequired)} required</small></div>
+          <div><dt>Application deadline</dt><dd>{date(result.opportunity.deadline)}</dd>
+            <small>{result.deadlineDays} days from assessment · {result.opportunity.deadlineTimezone}</small></div>
+          <div><dt>Application</dt><dd>{result.submissionStatus}</dd>
+            <small>Human review required</small></div>
+        </dl>
+        {unresolved.length > 0 && <div className="assessment-conditions">
+          <h3>Conditions still open</h3>
+          <ul>{unresolved.map((criterion) => <li key={criterion.id}>
+            <strong>{criterion.status === 'not_met' ? 'Not met' : 'Unverified'}:</strong> {criterion.text}{' '}
+            <span className="assessment-citations">{citations(criterion.evidenceRefs)}</span>
+          </li>)}</ul>
+        </div>}
+        <p className="assessment-unknowns"><strong>Before submission:</strong> {result.unknownRequirements}</p>
       </section>
 
-      <section className="funding-card">
-        <h3>Evidence-backed rationale and next actions</h3>
-        <div className="funding-rationale">
-          {result.rationale.map((item) => (
-            <article key={item.heading}>
-              <h4>{item.heading}</h4>
-              <p>{item.text}</p>
-              <p className="funding-citations">{citations(item.evidenceRefs)}</p>
-            </article>
-          ))}
+      <section className="assessment-card assessment-actions" aria-labelledby="assessment-actions-title">
+        <div className="assessment-section-heading">
+          <h3 id="assessment-actions-title">What happens next</h3>
+          <span>Suggested actions · Nothing booked or submitted</span>
         </div>
-        <p><strong>{result.partner}:</strong> {result.partnerEvidence}</p>
-        <div className="funding-tasks">
-          {result.tasks.map((task) => (
-            <article key={task.id}>
-              <strong>{task.id}</strong>
-              <p>{task.text}</p>
-              <p>Owner: {task.owner.display} ({task.owner.id}) · due {task.due} · recorded {task.recordedState}</p>
-              {task.dependencyIds.length > 0 ? <p>Depends on: {task.dependencyIds.join(', ')}</p> : null}
-              <p className="funding-citations">{citations(task.evidenceRefs)}</p>
-              <span className="funding-pill uncertain">{task.status}</span>
-            </article>
-          ))}
+        <div className="assessment-table-wrap">
+          <table>
+            <caption className="assessment-sr-only">Ordered next actions with accountable owners and recorded status</caption>
+            <thead><tr><th scope="col">Action</th><th scope="col">Owner</th><th scope="col">Due</th><th scope="col">Status</th></tr></thead>
+            <tbody>{steps.map((step) => <tr key={step.id}>
+              <th scope="row"><span className="assessment-step">{step.order}.</span> {stepTitle(step)}</th>
+              <td>{step.owner?.display ?? 'Not assigned'}</td>
+              <td>{step.due ? date(step.due) : 'Not set'}</td>
+              <td>{step.status}</td>
+            </tr>)}</tbody>
+          </table>
         </div>
-        <p><strong>Executive review:</strong> {result.executiveReview}</p>
-        <p><strong>Legal/procurement:</strong> {result.legalConstraint}</p>
-        <p><strong>Application:</strong> {result.submissionStatus}. {result.unknownRequirements}</p>
+        <details className="assessment-action-details">
+          <summary>Dependencies and review constraints</summary>
+          <p><strong>Executive review:</strong> {result.executiveReview}</p>
+          <p><strong>Legal / procurement:</strong> {result.legalConstraint}</p>
+          <p><strong>{result.partner}:</strong> {result.partnerEvidence}</p>
+          <ol>{steps.map((step) => <li key={step.id}>
+            <strong>{stepTitle(step)}.</strong> {step.detail} Dependency: {step.dependency}{' '}
+            <span className="assessment-citations">{citations(step.evidenceRefs)}</span>
+          </li>)}</ol>
+        </details>
       </section>
 
-      <section className="funding-card funding-critical-path">
-        <h3>Ordered readiness path</h3>
-        <ol className="funding-list">
-          {result.criticalPath.map((step) => (
-            <li key={step.id}>
-              <span className={`funding-pill ${step.status === 'At risk' ? 'not_met' : step.status === 'Available' ? 'unknown' : ''}`}>
-                {step.status}
-              </span>
-              <span>
-                <strong>{step.order}. {step.title}</strong>
-                <span className="funding-path-detail">
-                  {step.owner ? `Owner: ${step.owner.display} (${step.owner.id}) · ` : ''}
-                  {step.due ? `due ${step.due} · ` : ''}Dependency: {step.dependency}. {step.detail}
-                </span>
-                <span className="funding-citations">{citations(step.evidenceRefs)}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="funding-card">
-        <h3>Evidence packet</h3>
-        <ol className="funding-list">
-          {result.evidence.map((item) => (
-            <li key={item.refId}>
-              <a href={resolveApiUrl(item.url)}>{item.refId} · {item.title}</a>
-              <span>{item.source.toUpperCase()} · {item.sourceType} · {item.snippet}</span>
-            </li>
-          ))}
-        </ol>
-        <h3>Assessment steps</h3>
-        <ol className="funding-list">
-          {result.trace.map((step) => <li key={step.ts}><strong>{step.step}</strong><span>{step.detail}</span></li>)}
-        </ol>
-      </section>
-      <p className="funding-disclaimer">{result.disclaimer}</p>
+      <div className="assessment-support">
+        <details className="assessment-detail">
+          <summary>Eligibility and funding calculation</summary>
+          <p>{result.amendmentSummary}</p>
+          <ul>{result.criteria.map((criterion) => <li key={criterion.id}>
+            <strong>{criterion.status === 'met' ? 'Met' : criterion.status === 'not_met' ? 'Not met' : 'Unverified'}:</strong>{' '}
+            {criterion.text} <span className="assessment-citations">{citations(criterion.evidenceRefs)}</span>
+          </li>)}</ul>
+          <p>{result.matchBasis}</p>
+          <p>Eligible project costs: {money.format(result.opportunity.eligibleCostBasis)}.
+            Requested grant: {money.format(result.opportunity.requestedAmount)}.</p>
+          <p>Required {money.format(result.matchRequired)} − confirmed {money.format(result.matchConfirmed)} =
+            gap {money.format(result.matchGap)}. Proposed {money.format(result.matchProposed)} is not counted as confirmed.</p>
+        </details>
+        <details className="assessment-detail">
+          <summary>Sources ({result.evidence.length})</summary>
+          <ol className="assessment-sources">{result.evidence.map((item) => <li key={item.refId}>
+            <a href={resolveApiUrl(item.url)} target="_blank" rel="noopener noreferrer">{item.title}</a>
+            <span>{sourceNames[item.source]}</span>
+          </li>)}</ol>
+        </details>
+        <details className="assessment-detail assessment-diagnostics">
+          <summary>Technical details</summary>
+          <p>{result.mode === 'live' ? 'Live Fabric records' : 'Local fixture records'} ·{' '}
+            {result.knowledgeMode === 'foundry_iq' ? 'Live Foundry IQ' : 'Packaged funding documents'} ·{' '}
+            {result.workMode === 'work_iq' ? 'Live Work IQ' : 'Packaged team documents'} · Packaged external guidance</p>
+          <p>{result.narrativeModel ? `Narrative model: ${result.narrativeModel}` : 'Deterministic fixture narrative'}</p>
+          <ol>{result.trace.map((step, index) => <li key={`${step.ts}-${index}`}>
+            <strong>{step.step}</strong> {step.detail}
+          </li>)}</ol>
+        </details>
+      </div>
+      <p className="assessment-disclaimer">{result.disclaimer}</p>
     </div>
   )
 }

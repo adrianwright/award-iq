@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Deploy the AMC IQ web UI to the Static Web App (reliable, no local Docker, no Oryx rebuild).
+  Deploy the Award IQ web UI to the Static Web App (reliable, no local Docker, no Oryx rebuild).
 .DESCRIPTION
   `azd deploy web` (and `swa deploy`) try to run an Oryx build over the already-built `apps/web/dist`
   folder, which fails in some environments ("deployment binary exited with code 1" during
