@@ -17,8 +17,14 @@ funding_opportunities:
     hero: true
     as_of_date: "2026-11-16"
     deadline: "2026-12-16"
+    deadline_timezone: America/New_York
+    program_id: PROGRAM-RESILIENCE
+    project_id: PROJECT-RESILIENCE-2026
+    applicant_org_id: ORG-NORTHSTAR
+    geography_id: GEO-NORTHSTAR-DISTRICT
     total_eligible_project_costs: 9000000
-    current_amendment: 2
+    requested_grant: 6750000
+    current_amendment_id: AMD-FO117-02
     required_match_rate: 0.25
     required_match: 2250000
     confirmed_match: 1800000
@@ -31,6 +37,16 @@ funding_opportunities:
       - id: TASK-117-PARTNER
         owner: PM-01
         due: "2026-11-20"
+  - id: FO-2026-204
+    title: Heat-Ready Community Facilities Grant
+    hero: false
+    readiness: Ready to submit; not submitted
+    query_terms: [ready comparator, fully ready, heat-ready]
+  - id: FO-2026-330
+    title: Rural Access Infrastructure Grant
+    hero: false
+    readiness: Not eligible on the evidenced geography criterion
+    query_terms: [failed eligibility, ineligible comparator, rural access]
 
 people:
   - id: PM-01

@@ -1,3 +1,5 @@
-source_id,notice_id,source,amount,status,owner_id,evidence_id
-MATCH-2026-CAPITAL,FO-2026-117,2026 capital plan,1800000,Confirmed,FIN-02,award-iq-foundry-match-memo-v2
-MATCH-RESERVE-CANDIDATE,FO-2026-117,Capital reserve,450000,Proposed,FIN-02,award-iq-work-match-huddle-v2
+allocation_id,notice_id,project_id,source,amount,currency,status,evidence_date,owner_id,evidence_document_id,restrictions
+ALLOC-CAPITAL-2026-FO117,FO-2026-117,PROJECT-RESILIENCE-2026,2026 capital plan,1800000,USD,Confirmed,2026-10-31,FIN-02,DOC-FO117-MATCH,Existing capital-plan allocation; count once by allocation ID.
+ALLOC-RESERVE-CANDIDATE-FO117,FO-2026-117,PROJECT-RESILIENCE-2026,Capital reserve,450000,USD,Proposed,2026-11-09,FIN-02,DOC-FO117-FINANCE-MSG,Do not count until Finance confirms source and restriction eligibility.
+ALLOC-HEAT-LOCAL-FO204,FO-2026-204,PROJECT-HEAT-READY-2026,City resilience fund,100000,USD,Confirmed,2026-10-20,FIN-02,DOC-FO204-READINESS,Single documented allocation.
+ALLOC-RURAL-LOCAL-FO330,FO-2026-330,PROJECT-RURAL-ACCESS-2026,City infrastructure reserve,200000,USD,Confirmed,2026-10-18,FIN-02,DOC-FO330-READINESS,Single documented allocation.

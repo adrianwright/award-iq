@@ -1,2 +1,3 @@
-person_id,notice_id,unavailable_from,unavailable_through,work_must_finish_by
-LEGAL-01,FO-2026-117,2026-11-23,2026-11-27,2026-11-20
+workload_id,person_id,notice_id,team,period,available_capacity_hours,committed_work_hours,unavailable_from,unavailable_through,work_must_finish_by,dependency_ids,evidence_document_id
+WORKLOAD-LEGAL-FO117,LEGAL-01,FO-2026-117,Legal and Procurement,2026-11,8,6,2026-11-23,2026-11-27,2026-11-20,TASK-117-MATCH;TASK-117-PARTNER,DOC-FO117-LEGAL-AVAIL
+WORKLOAD-PM-FO117,PM-01,FO-2026-117,Grant Proposal Team,2026-11,24,18,,,2026-12-16,TASK-117-MATCH;TASK-117-PARTNER,DOC-FO117-HUDDLE

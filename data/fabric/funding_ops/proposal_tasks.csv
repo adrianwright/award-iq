@@ -1,3 +1,3 @@
-task_id,notice_id,description,owner_id,status,due_date
-TASK-117-MATCH,FO-2026-117,Confirm capital-reserve match source,FIN-02,Open,2026-11-18
-TASK-117-PARTNER,FO-2026-117,Obtain current regional-partner commitment letter,PM-01,Open,2026-11-20
+task_id,notice_id,description,owner_id,status,due_date,dependency_ids,supporting_document_ids
+TASK-117-MATCH,FO-2026-117,Confirm and document the proposed capital-reserve match without changing the existing capital-plan allocation.,FIN-02,Open,2026-11-18,,DOC-FO117-FINANCE-MSG;DOC-FO117-TRACKER2
+TASK-117-PARTNER,FO-2026-117,Obtain the current Regional Transit Authority commitment letter after executive review.,PM-01,Open,2026-11-20,SLOT-EXEC-FO117-20261119,DOC-FO117-PARTNER-MSG;DOC-FO117-HUDDLE

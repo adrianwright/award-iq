@@ -1,4 +1,12 @@
-criterion_id,notice_id,criterion,status,evidence_id
-FO-2026-117-ELIG-01,FO-2026-117,Eligible local public applicant,met,award-iq-foundry-applicant-eligibility-v1
-FO-2026-117-ELIG-02,FO-2026-117,Regional partner commitment letter,uncertain,award-iq-foundry-amendment-2-v1
-FO-2026-117-ELIG-03,FO-2026-117,Required 25% local match confirmed,uncertain,award-iq-foundry-match-policy-v1
+criterion_id,notice_id,amendment_id,criterion_type,rule,observed_fact,status,evidence_document_id
+FO117-ELIG-APPLICANT,FO-2026-117,AMD-FO117-02,applicant_type,Applicant must be a local public entity.,City of Northstar is a local public entity.,met,DOC-FO117-ELIG
+FO117-ELIG-GEOGRAPHY,FO-2026-117,AMD-FO117-02,geography,Project must serve the Northstar Resilience District.,The synthetic project geography is the Northstar Resilience District.,met,DOC-FO117-ELIG
+FO117-ELIG-MATCH,FO-2026-117,AMD-FO117-02,match,25% of total eligible project costs must be documented.,"A portion is confirmed; $450,000 remains proposed and unconfirmed.",unknown,DOC-FO117-MATCH
+FO117-ELIG-PARTNER,FO-2026-117,AMD-FO117-02,partner_letter,A current signed regional-partner letter must accompany the application.,No current letter is recorded; 2024 correspondence is historical only.,unknown,DOC-FO117-PARTNER
+FO204-ELIG-APPLICANT,FO-2026-204,AMD-FO204-01,applicant_type,Applicant must be a local public entity.,Riverbend City is a local public entity.,met,DOC-FO204-TERMS
+FO204-ELIG-GEOGRAPHY,FO-2026-204,AMD-FO204-01,geography,Project must be within the eligible Riverbend City area.,Project geography is Riverbend City.,met,DOC-FO204-TERMS
+FO204-ELIG-MATCH,FO-2026-204,AMD-FO204-01,match,10% local match must be confirmed.,"A unique $100,000 local allocation is confirmed.",met,DOC-FO204-READINESS
+FO204-ELIG-PARTNER,FO-2026-204,AMD-FO204-01,partner_waiver,Partner condition may be waived with approved waiver.,Waiver WAIVER-FO204-01 is approved.,met,DOC-FO204-READINESS
+FO330-ELIG-APPLICANT,FO-2026-330,AMD-FO330-01,applicant_type,Applicant must be a local public entity.,City of Northstar is a local public entity.,met,DOC-FO330-TERMS
+FO330-ELIG-GEOGRAPHY,FO-2026-330,AMD-FO330-01,geography,Project must be in Pine County Rural Service Area.,Northstar Resilience District is outside Pine County.,not_met,DOC-FO330-TERMS
+FO330-ELIG-MATCH,FO-2026-330,AMD-FO330-01,match,10% local match must be confirmed.,"A unique $200,000 local allocation is confirmed.",met,DOC-FO330-READINESS

@@ -1,2 +1,2 @@
-slot_id,notice_id,reviewer_id,date,start_time,end_time,timezone,status
-SLOT-EXEC-2026-1119,FO-2026-117,EXEC-01,2026-11-19,10:00,11:00,"America/Los_Angeles (PST, UTC-08:00)",Available
+slot_id,notice_id,reviewer_id,review_id,start_date,start_time,end_date,end_time,timezone,status,purpose,dependency_ids,evidence_document_id
+SLOT-EXEC-FO117-20261119,FO-2026-117,EXEC-01,REVIEW-FO-2026-117-2026-11-05,2026-11-19,10:00,2026-11-19,11:00,America/New_York,Available,Review documented match and remaining risks; not a final unconditional approval.,TASK-117-MATCH,DOC-FO117-HUDDLE

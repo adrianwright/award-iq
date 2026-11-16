@@ -91,7 +91,7 @@ def ask_funding(
     request: AskRequest,
     _user: AuthenticatedUser | None = Depends(require_api_user),
 ) -> FundingAssessment:
-    """Assess the deterministic synthetic FO-2026-117 grant scenario."""
+    """Assess the selected deterministic synthetic funding opportunity."""
     return assess_funding(settings, request.question)
 
 
@@ -117,12 +117,28 @@ async def ask_funding_stream(
                 "event": "source_query",
                 "data": json.dumps({"source": source, "label": label, "query": request.question, "status": "searching"}),
             }
+        preliminary = assess_funding(settings, request.question)
+        retrieved = {item["source"]: item for item in preliminary.sourceMap}
         source_states = {}
         for source, label in sources:
-            source_states[Source(source)] = "complete"
+            source_result = retrieved[source]
+            state = source_result["status"]
+            citations = source_result["citations"]
+            summary = (
+                "Retrieved synthetic funding evidence."
+                if citations
+                else "No synthetic evidence is available for this source and opportunity."
+            )
+            source_states[Source(source)] = state
             yield {
                 "event": "source_result",
-                "data": json.dumps({"source": source, "status": "complete", "summary": "Retrieved synthetic funding evidence.", "citations": [], "durationMs": 0}),
+                "data": json.dumps({
+                    "source": source,
+                    "status": state,
+                    "summary": summary,
+                    "citations": citations,
+                    "durationMs": 0,
+                }),
             }
         result = assess_funding(settings, request.question, source_states=source_states)
         yield {"event": "final", "data": json.dumps({"result": result.model_dump()})}

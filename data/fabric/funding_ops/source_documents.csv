@@ -1,0 +1,31 @@
+document_id,notice_id,title,source,source_type,filename,version,publication_date,effective_from,supersedes,summary
+DOC-FO117-NOTICE,FO-2026-117,Original opportunity notice,foundry,Funding notice,FO-2026-117_notice_v1.md,1,2026-09-01,2026-09-01,,"Applicant, geographic and project purpose terms."
+DOC-FO117-AMD1,FO-2026-117,Amendment 1,foundry,Superseded amendment,FO-2026-117_amendment_1_v1.md,1,2026-09-10,2026-09-10,,Earlier 20% match and no partner-letter condition.
+DOC-FO117-AMD2,FO-2026-117,Amendment 2,foundry,Current effective amendment,FO-2026-117_amendment_2_v1.md,2,2026-10-28,2026-10-28,DOC-FO117-AMD1,Current 25% match and signed regional partner letter.
+DOC-FO117-ELIG,FO-2026-117,Applicant eligibility rules,foundry,Eligibility guidance,FO-2026-117_applicant_eligibility_v1.md,1,2026-09-01,2026-09-01,,Local public applicant and eligible geography.
+DOC-FO117-MATCH,FO-2026-117,Local matching-fund policy,foundry,Finance policy,FO-2026-117_match_policy_v1.md,1,2026-10-30,2026-10-30,,Confirmed funds counted once by allocation ID; proposed sources excluded.
+DOC-FO117-PARTNER,FO-2026-117,Regional partner guidance,foundry,Partner guidance,FO-2026-117_regional_partner_guidance_v1.md,1,2026-10-28,2026-10-28,,Current signed letter must accompany application.
+DOC-FO117-LEGAL,FO-2026-117,Legal and procurement checklist,foundry,Legal checklist,FO-2026-117_legal_procurement_checklist_v1.md,1,2026-10-30,2026-10-30,,Review must precede authorized submission.
+DOC-FO117-APPROVAL,FO-2026-117,Institutional approval policy,foundry,Approval policy,FO-2026-117_approval_policy_v1.md,1,2026-10-15,2026-10-15,,Pursuit status and approval are distinct from a funding award.
+DOC-FO117-COMMUNITY,FO-2026-117,Community needs snapshot,foundry,Community evidence,FO-2026-117_community_needs_v1.md,1,2026-10-31,2026-10-31,,Synthetic population and underserved-community indicators.
+DOC-FO117-PERFORMANCE,FO-2026-117,Program outcomes and proposed targets,foundry,Program performance,FO-2026-117_program_outcomes_v1.md,1,2026-10-31,2026-10-31,,"Prior delivery and proposed, not achieved, project targets."
+DOC-FO117-PRIOR24,FO-2026-117,2024 prior proposal record,work,Prior proposal,FO-2026-117_prior_proposal_2024_v1.md,1,2024-08-01,2024-08-01,,Historical RTA letter lead; award outcome unknown.
+DOC-FO117-TRACKER1,FO-2026-117,Readiness tracker v1,work,Superseded tracker,FO-2026-117_readiness_tracker_v1.md,1,2026-11-06,2026-11-06,,"Stale 20% match assumption, superseded by v2."
+DOC-FO117-TRACKER2,FO-2026-117,Readiness tracker v2,work,Current readiness tracker,FO-2026-117_readiness_tracker_v2.md,2,2026-11-09,2026-11-09,DOC-FO117-TRACKER1,"Current 25% match gap, tasks and unresolved partner letter."
+DOC-FO117-MATCH-MEMO1,FO-2026-117,Match-funding memo v1,work,Superseded match memo,FO-2026-117_match_funding_memo_v1.md,1,2026-11-06,2026-11-06,,"Earlier match assumption, superseded after Amendment 2."
+DOC-FO117-MATCH-MEMO2,FO-2026-117,Match-funding memo v2,work,Current match memo,FO-2026-117_match_funding_memo_v2.md,2,2026-11-09,2026-11-09,DOC-FO117-MATCH-MEMO1,Separates confirmed capital-plan allocation from proposed reserve.
+DOC-FO117-DECISION1,FO-2026-117,Pursue decision brief v1,work,Superseded decision brief,FO-2026-117_pursue_decision_brief_v1.md,1,2026-11-06,2026-11-06,,Stale assumptions superseded by v2.
+DOC-FO117-DECISION2,FO-2026-117,Pursue decision brief v2,work,Current decision brief,FO-2026-117_pursue_decision_brief_v2.md,2,2026-11-09,2026-11-09,DOC-FO117-DECISION1,Conditional pursuit and decision boundaries.
+DOC-FO117-REVIEW,FO-2026-117,Go/no-go review minutes,work,Human review,FO-2026-117_review_minutes_2026-11-05.md,1,2026-11-05,2026-11-05,,Recorded Pursue - pending disposition.
+DOC-FO117-HUDDLE,FO-2026-117,Proposal huddle notes,work,Proposal workflow,FO-2026-117_proposal_huddle_2026-11-09.md,1,2026-11-09,2026-11-09,,"Owner tasks, review slot, sequencing and leave constraints."
+DOC-FO117-FINANCE-MSG,FO-2026-117,Finance match confirmation message,work,Synthetic Teams message,proposal_teams_messages.json,1,2026-11-09,2026-11-09,,Capital reserve remains proposed; Maria owns confirmation.
+DOC-FO117-PARTNER-MSG,FO-2026-117,Partner outreach context,work,Synthetic email context,proposal_email_context.json,1,2026-11-09,2026-11-09,,Current partner letter is not yet received.
+DOC-FO117-LEGAL-AVAIL,FO-2026-117,Legal reviewer availability,work,Staff calendar evidence,FO-2026-117_legal_availability_v1.md,1,2026-11-09,2026-11-09,,Sam unavailable Nov 23-27; finish review by Nov 20.
+DOC-FO117-EXTERNAL,FO-2026-117,Agency guidance snapshot,web,Synthetic cached guidance,FO-2026-117_agency_guidance_v1.md,1,2026-11-02,2026-11-02,,"Locally cached synthetic guidance, not live web evidence."
+DOC-FO204-TERMS,FO-2026-204,Heat-ready notice and scoring terms,foundry,Funding notice,FO-2026-204_terms_v1.md,1,2026-09-01,2026-09-01,,Eligible project and scoring objectives.
+DOC-FO204-READINESS,FO-2026-204,Heat-ready readiness review,work,Readiness record,FO-2026-204_readiness_v1.md,1,2026-11-10,2026-11-10,,"Confirmed match, partner waiver and internal readiness approval."
+DOC-FO330-TERMS,FO-2026-330,Rural access notice terms,foundry,Funding notice,FO-2026-330_terms_v1.md,1,2026-10-01,2026-10-01,,Geographic restriction and required 10% match.
+DOC-FO330-READINESS,FO-2026-330,Rural access eligibility review,work,Readiness record,FO-2026-330_readiness_v1.md,1,2026-11-12,2026-11-12,,Failed geography condition; other eligibility not inferred.
+DOC-FO117-STRUCTURED,FO-2026-117,Structured funding snapshot,fabric,Structured operations snapshot,FO-2026-117_structured_snapshot_v1.md,1,2026-11-16,2026-11-16,,Synthetic structured records and fixture-design financing basis.
+DOC-FO204-STRUCTURED,FO-2026-204,Heat-ready structured funding snapshot,fabric,Structured operations snapshot,FO-2026-204_structured_snapshot_v1.md,1,2026-11-16,2026-11-16,,"Synthetic linked opportunity, budget, match, and readiness records."
+DOC-FO330-STRUCTURED,FO-2026-330,Rural access structured funding snapshot,fabric,Structured operations snapshot,FO-2026-330_structured_snapshot_v1.md,1,2026-11-16,2026-11-16,,"Synthetic linked opportunity, geography, budget, and match records."

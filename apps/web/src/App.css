@@ -58,6 +58,8 @@
 .funding-hero textarea { display: block; width: 100%; resize: vertical; border: 1px solid #b8c0d0; border-radius: 8px; padding: 0.8rem; font: inherit; color: inherit; }
 .funding-hero button { margin-top: 0.8rem; border: 0; border-radius: 8px; padding: 0.7rem 1rem; color: #fff; background: #354cb7; font: inherit; font-weight: 700; cursor: pointer; }
 .funding-hero button:disabled { opacity: 0.6; cursor: wait; }
+.funding-example-questions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.5rem; }
+.funding-hero .funding-example-questions button { margin: 0; padding: 0.4rem 0.6rem; color: #354cb7; background: #f1f3fc; border: 1px solid #d5daf0; font-size: 0.82rem; text-align: left; }
 .funding-progress h2, .funding-card h3 { margin-top: 0; }
 .funding-source-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.7rem; }
 .funding-source { display: flex; justify-content: space-between; gap: 0.5rem; border: 1px solid #e1e5ef; border-radius: 8px; padding: 0.75rem; font-size: 0.86rem; }
@@ -75,10 +77,16 @@
 .funding-list li { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 0.6rem; }
 .funding-list li span:last-child:not(.funding-pill) { color: #647087; }
 .funding-pill { display: inline-block; border-radius: 99px; padding: 0.22rem 0.55rem; background: #e7f6ec; color: #176f35; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
-.funding-pill.uncertain { background: #fff2d6; color: #875000; }
+.funding-pill.uncertain, .funding-pill.unknown { background: #fff2d6; color: #875000; }
 .funding-pill.not_met { background: #fde8e8; color: #a22222; }
 .funding-citations { display: flex; gap: 0.35rem; }
-.funding-citations a { color: #354cb7; font-size: 0.8rem; font-weight: 700; }
+.funding-citations a { color: #354cb7; font-size: 0.8rem; font-weight: 700; overflow-wrap: anywhere; }
+.funding-rationale { display: grid; gap: 0.6rem; }
+.funding-rationale article { padding: 0.75rem; border-left: 3px solid #7382d2; background: #f7f8fc; }
+.funding-rationale h4 { margin: 0 0 0.35rem; }
+.funding-rationale p { margin: 0.35rem 0; }
+.funding-path-detail { display: block; margin-top: 0.3rem; color: #59647a; }
+.funding-critical-path .funding-list li { grid-template-columns: auto minmax(0, 1fr); }
 .funding-amounts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem; margin: 1rem 0; }
 .funding-amounts > div { background: #f6f7fb; border-radius: 8px; padding: 0.75rem; }
 .funding-amounts span, .funding-amounts strong { display: block; }

@@ -1,6 +1,6 @@
 # Award IQ API
 
-FastAPI serves the deterministic, synthetic FO-2026-117 funding-readiness assessment at
+FastAPI serves deterministic, synthetic funding-readiness assessments for three linked opportunities at
 `POST /api/funding/ask` and its streamed equivalent at `POST /api/funding/ask/stream`.
 
 Run locally without Azure:
@@ -12,8 +12,10 @@ USE_LIVE_WORK=false USE_LIVE_WEB=false USE_LIVE_AGENT=false \
 python -m uvicorn app.main:app --app-dir services/api --port 8000
 ```
 
-The funding route reads checked-in tables under `data/fabric/funding_ops/` and synthetic evidence
-documents under `data/`. The routes do not write to Microsoft 365 or submit any grant materials.
+The funding routes resolve the requested notice from checked-in tables under
+`data/fabric/funding_ops/` and synthetic evidence documents under `data/`. They default to
+FO-2026-117 when a question does not identify a comparator. The routes do not write to Microsoft 365
+or submit any grant materials.
 `/api/evidence/doc` serves only allowlisted synthetic evidence; see
 [`../../docs/api-contract.md`](../../docs/api-contract.md).
 

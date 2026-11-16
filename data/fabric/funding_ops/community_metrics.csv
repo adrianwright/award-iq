@@ -1,2 +1,4 @@
-metric_id,notice_id,metric,value,as_of_date
-METRIC-FO-2026-117-01,FO-2026-117,Priority service-area population,18400,2026-10-31
+metric_id,program_id,geography_id,metric,value,unit,period,eligibility_relevance,source_document_id
+COMM-RES-01,PROGRAM-RESILIENCE,GEO-NORTHSTAR-DISTRICT,Residents in priority service area,18400,people,2026-10-31,Population served by resilience assets.,DOC-FO117-COMMUNITY
+COMM-RES-02,PROGRAM-RESILIENCE,GEO-NORTHSTAR-DISTRICT,Residents in households below local median income,32,percent,2026-10-31,Notice scoring gives weight to service continuity for underserved communities.,DOC-FO117-COMMUNITY
+COMM-HEAT-01,PROGRAM-HEAT-READY,GEO-RIVERBEND-CITY,Residents in high heat-risk census tracts,6200,people,2026-09-30,Program objective prioritizes public heat-safety access.,DOC-FO204-TERMS

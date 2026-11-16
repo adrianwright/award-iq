@@ -13,10 +13,22 @@ snapshot; it is not a live connection.
 ## Hero scenario
 
 As of **2026-11-16**, notice **FO-2026-117, Community Resilience Infrastructure Grant**, closes
-**2026-12-16** (30 calendar days). Current Amendment 2 requires a 25% local match against
-$9,000,000 eligible costs: $2,250,000 total. $1,800,000 is confirmed, leaving a $450,000 gap;
-proposed funds are not counted. The recorded human disposition is **Pursue - pending**, conditional
-on resolving that gap and obtaining a current regional-partner commitment letter.
+**2026-12-16, America/New_York** (30 calendar days). The $9,000,000 eligible-cost basis and
+$6,750,000 grant request are explicit synthetic fixture-design assumptions. Current Amendment 2
+requires a 25% local match ($2,250,000); $1,800,000 is confirmed, leaving a $450,000 gap. The
+separate $450,000 reserve is proposed and is not counted. The recorded human disposition is
+**Pursue - pending**, conditional on resolving the gap and obtaining a current regional-partner
+commitment letter.
+
+The answer also grounds conditional pursuit in the proposed project's measurable resilience target,
+community needs snapshot, documented prior delivery, and the 2024 partner lead (whose award outcome
+is unknown). These are reasons to consider pursuing, not evidence of award likelihood. The Nov 19
+review slot is available but not booked or final approval; the partner letter follows it and is due
+Nov 20. Legal/procurement review must also finish by Nov 20, before the reviewer's Nov 23–27 leave.
+
+Two concise comparators exercise distinct outcomes: FO-2026-204 is ready for human submission review
+but not submitted; FO-2026-330 fails the evidenced rural-geography condition. Use the example
+questions in the UI or ask about either notice ID.
 
 Jordan Lee (PM-01) owns the proposal and partner-letter task due 2026-11-20. Maria Santos (FIN-02)
 owns match confirmation due 2026-11-18. The assessment also shows the 2026-11-19 executive-review
@@ -59,8 +71,9 @@ questions. Evidence links resolve to the synthetic versioned source files.
 ## Data and validation
 
 The funding operations tables are defined in `data/fabric/funding_ops/generate.py`; the generator is
-deterministic. Foundry-style notice/policy documents are in `data/foundry_docs/`, proposal workflow
-fixtures are in `data/work/`, and the scenario's semantic contract is
+deterministic and the dictionary documents field types, nullable semantics, keys, joins, and source
+precedence. Foundry-style notice/policy documents are in `data/foundry_docs/`, versioned proposal
+workflow fixtures are in `data/work/`, and the scenario's semantic contract is
 `data/ontology/funding_ontology.yaml`.
 
 ```bash

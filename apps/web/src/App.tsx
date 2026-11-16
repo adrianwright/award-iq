@@ -14,6 +14,11 @@ const SOURCES: Array<{ source: IQSource; label: string }> = [
   { source: 'work', label: 'Work IQ' },
   { source: 'web', label: 'External evidence' },
 ]
+const QUESTION_EXAMPLES = [
+  'How much confirmed match is still missing, and what must happen next?',
+  'Is FO-2026-204 ready to submit?',
+  'Which eligibility criterion is not met for FO-2026-330?',
+]
 
 function App() {
   const { getAccessToken } = useAuthentication()
@@ -38,7 +43,9 @@ function App() {
       const assessment = await askFundingStream(question, token, (event) => {
         setProgress((current) => ({ ...current, [event.source]: event.status ?? 'searching' }))
       })
-      setProgress(Object.fromEntries(SOURCES.map(({ source }) => [source, 'complete'])) as Record<IQSource, SourceStatus>)
+      setProgress(Object.fromEntries(
+        assessment.sourceMap.map(({ source, status }) => [source, status]),
+      ) as Record<IQSource, SourceStatus>)
       setResult(assessment)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The funding assessment could not be completed.')
@@ -66,6 +73,18 @@ function App() {
             onChange={(event) => setQuestion(event.target.value)}
             rows={4}
           />
+          <div className="funding-example-questions" aria-label="Example funding questions">
+            {QUESTION_EXAMPLES.map((example) => (
+              <button
+                type="button"
+                key={example}
+                onClick={() => setQuestion(example)}
+                disabled={loading}
+              >
+                {example}
+              </button>
+            ))}
+          </div>
           <button type="button" onClick={() => void runAssessment()} disabled={loading || !question.trim()}>
             {loading ? 'Building assessment…' : 'Assess funding readiness'}
           </button>

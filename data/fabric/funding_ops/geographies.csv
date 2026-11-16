@@ -1,0 +1,4 @@
+geography_id,name,geography_type,eligible_area
+GEO-NORTHSTAR-DISTRICT,Northstar Resilience District,Service district,true
+GEO-RIVERBEND-CITY,Riverbend City,Municipality,true
+GEO-PINE-RURAL,Pine County Rural Service Area,Rural service area,true

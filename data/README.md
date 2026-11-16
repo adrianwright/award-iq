@@ -1,8 +1,9 @@
 # Award IQ synthetic data
 
-The active scenario is the fictional FO-2026-117 Community Resilience Infrastructure Grant.
-Scenario date and deadline are pinned (2026-11-16 and 2026-12-16); they never float with the
-machine's current date.
+The active funding package contains three linked scenarios. Hero notice FO-2026-117 is pinned to
+2026-11-16 and deadline 2026-12-16 America/New_York; dates never float with the machine's clock.
+FO-2026-204 is ready to submit for internal review, while FO-2026-330 fails the evidenced geography
+criterion.
 
 | Directory | Role |
 |---|---|
@@ -12,9 +13,10 @@ machine's current date.
 | `work/` | Proposal huddle, decision minutes, versioned readiness trackers/memos, historical partner evidence |
 | `web/` | Offline synthetic external agency-guidance snapshot |
 
-The required match is computed as 25% of $9,000,000 total eligible costs ($2,250,000). The confirmed
-2026 capital-plan amount is $1,800,000, leaving a $450,000 gap. Proposed funds do not count as
-confirmed. The Regional Transit Authority's 2024 letter is a historical lead, not a current letter.
+The hero $9M eligible-cost basis and $6.75M requested grant are documented synthetic assumptions.
+Amendment 2 requires $2.25M match; the $1.8M confirmed capital-plan allocation leaves a $450K gap.
+The proposed reserve is excluded until Finance confirmation. The RTA's 2024 letter is a historical
+lead, not a current commitment.
 
 The clinical corpus and generator are retained for source-history compatibility only; they do not
 feed the Award IQ UI or `/api/funding/*` routes.

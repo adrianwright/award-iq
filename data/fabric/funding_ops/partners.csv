@@ -1,2 +1,3 @@
-partner_id,notice_id,name,current_commitment,historical_evidence
-PARTNER-RTA,FO-2026-117,Regional Transit Authority,Not received,award-iq-work-prior-proposal-2024-v1
+partner_id,partner_org_id,notice_id,name,region,partner_type,qualifies,commitment_status,letter_document_id,letter_date,historical_proposal_id,evidence_document_id
+PARTNER-RTA-FO117,ORG-RTA,FO-2026-117,Regional Transit Authority,Northstar Resilience District,Regional public authority,true,Missing,,,PR-RESILIENCE-2024,DOC-FO117-PARTNER
+PARTNER-RIVERBEND-FO204,ORG-RIVERBEND-PHD,FO-2026-204,Riverbend Public Health District,Riverbend City,Public health district,true,Not required,,,,DOC-FO204-READINESS

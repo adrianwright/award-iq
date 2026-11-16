@@ -1,2 +1,3 @@
-approval_id,notice_id,review_date,decision,conditions,record_type
-REVIEW-FO-2026-117-2026-11-05,FO-2026-117,2026-11-05,Pursue - pending,Match confirmation and partner commitment letter,Recorded review; not an approval
+approval_id,notice_id,project_id,approval_type,required_owner_id,state,decision,decision_date,conditions,dependencies,evidence_document_id,record_type
+REVIEW-FO-2026-117-2026-11-05,FO-2026-117,PROJECT-RESILIENCE-2026,Go/no-go pursuit review,EXEC-01,Pending,Pursue - pending,2026-11-05,Confirm match and current partner letter; executive review may be conditional if evidence remains open.,TASK-117-MATCH;SLOT-EXEC-FO117-20261119;TASK-117-PARTNER,DOC-FO117-REVIEW,Recorded review; not funding approval
+APPROVAL-FO204-READINESS,FO-2026-204,PROJECT-HEAT-READY-2026,Internal submission readiness,EXEC-01,Approved,Ready to submit,2026-11-10,Application still requires submission by its deadline.,MATCH-HEAT-READY;PARTNER-WAIVER-FO204,DOC-FO204-READINESS,Internal readiness only; not a funding award

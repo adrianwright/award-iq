@@ -1,3 +1,9 @@
-line_id,notice_id,basis,amount,classification
-BUDGET-FO-2026-117-TOTAL,FO-2026-117,Total eligible project costs,9000000,Planning basis
-BUDGET-FO-2026-117-MATCH,FO-2026-117,25% local match of total eligible project costs,2250000,Required match
+line_id,notice_id,project_id,category,amount,currency,classification,evidence_document_id
+BUD-FO117-01,FO-2026-117,PROJECT-RESILIENCE-2026,Drainage and flood-control assets,3000000,USD,Eligible project cost,DOC-FO117-NOTICE
+BUD-FO117-02,FO-2026-117,PROJECT-RESILIENCE-2026,Emergency backup power,2500000,USD,Eligible project cost,DOC-FO117-NOTICE
+BUD-FO117-03,FO-2026-117,PROJECT-RESILIENCE-2026,Community cooling and service continuity hubs,2000000,USD,Eligible project cost,DOC-FO117-NOTICE
+BUD-FO117-04,FO-2026-117,PROJECT-RESILIENCE-2026,Engineering and resilience planning,1500000,USD,Eligible project cost,DOC-FO117-NOTICE
+BUD-FO204-01,FO-2026-204,PROJECT-HEAT-READY-2026,Public facility cooling upgrades,700000,USD,Eligible project cost,DOC-FO204-TERMS
+BUD-FO204-02,FO-2026-204,PROJECT-HEAT-READY-2026,Heat safety and access improvements,300000,USD,Eligible project cost,DOC-FO204-TERMS
+BUD-FO330-01,FO-2026-330,PROJECT-RURAL-ACCESS-2026,Rural service access improvements,1500000,USD,Eligible project cost,DOC-FO330-TERMS
+BUD-FO330-02,FO-2026-330,PROJECT-RURAL-ACCESS-2026,Resilient access infrastructure,500000,USD,Eligible project cost,DOC-FO330-TERMS
