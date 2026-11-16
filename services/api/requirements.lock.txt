@@ -133,7 +133,7 @@ pydantic-settings==2.14.2
     # via
     #   -r services/api/requirements.txt
     #   mcp
-pygments==2.20.0
+pygments==2.21.0
     # via pytest
 pyjwt==2.13.0
     # via
