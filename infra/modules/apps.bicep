@@ -14,20 +14,10 @@ param identityPrincipalId string
 param identityClientId string
 param searchEndpoint string
 param foundryKbName string
-param webKbName string
-param projectEndpoint string
 param fabricWorkspaceId string
-param fabricDataAgentId string
 param azureSubscriptionId string
 param fabricCapacityResourceGroup string
 param fabricCapacityName string
-param eligibilityEvaluatorAgentName string
-param specialistEligibilityAgentName string
-param specialistRenalAgentName string
-param specialistGenomicsAgentName string
-param specialistProtocolAgentName string
-param specialistWorkflowAgentName string
-param specialistEvidenceAgentName string
 param tenantId string
 param apiAudience string
 param apiRequiredScope string
@@ -36,9 +26,19 @@ param workIqClientCertificateSecretName string
 param workIqEndpoint string
 param workIqScope string
 param useLiveWork bool
-param useLiveSpecialists bool
 param keyVaultUri string
 param tags object
+param fabricLakehouseId string = ''
+param fabricSqlServer string = ''
+param fabricSqlDatabase string = ''
+param useLiveFoundry bool = false
+param useLiveFundingLlm bool = false
+param foundryKsName string = ''
+param searchApiVersion string = '2026-05-01-preview'
+param modelEndpoint string = ''
+param modelDeployment string = ''
+param workIqFundingDocumentUrls string = ''
+param workIqFundingDocumentIdentities string = ''
 
 // Azure built-in AcrPull role definition ID: a public Microsoft constant, not an environment ID.
 var acrPullRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
@@ -156,20 +156,20 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
               value: foundryKbName
             }
             {
-              name: 'WEB_KB_NAME'
-              value: webKbName
-            }
-            {
-              name: 'PROJECT_ENDPOINT'
-              value: projectEndpoint
-            }
-            {
               name: 'FABRIC_WORKSPACE_ID'
               value: fabricWorkspaceId
             }
             {
-              name: 'FABRIC_DATA_AGENT_ID'
-              value: fabricDataAgentId
+              name: 'FABRIC_LAKEHOUSE_ID'
+              value: fabricLakehouseId
+            }
+            {
+              name: 'FABRIC_SQL_SERVER'
+              value: fabricSqlServer
+            }
+            {
+              name: 'FABRIC_SQL_DATABASE'
+              value: fabricSqlDatabase
             }
             {
               name: 'AZURE_SUBSCRIPTION_ID'
@@ -182,34 +182,6 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'FABRIC_CAPACITY_NAME'
               value: fabricCapacityName
-            }
-            {
-              name: 'ELIGIBILITY_EVALUATOR_AGENT'
-              value: eligibilityEvaluatorAgentName
-            }
-            {
-              name: 'SPECIALIST_ELIGIBILITY_AGENT'
-              value: specialistEligibilityAgentName
-            }
-            {
-              name: 'SPECIALIST_RENAL_AGENT'
-              value: specialistRenalAgentName
-            }
-            {
-              name: 'SPECIALIST_GENOMICS_AGENT'
-              value: specialistGenomicsAgentName
-            }
-            {
-              name: 'SPECIALIST_PROTOCOL_AGENT'
-              value: specialistProtocolAgentName
-            }
-            {
-              name: 'SPECIALIST_WORKFLOW_AGENT'
-              value: specialistWorkflowAgentName
-            }
-            {
-              name: 'SPECIALIST_EVIDENCE_AGENT'
-              value: specialistEvidenceAgentName
             }
             {
               name: 'CORS_ORIGINS'
@@ -230,6 +202,14 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'WORK_IQ_CLIENT_ID'
               value: workIqClientId
+            }
+            {
+              name: 'WORK_IQ_FUNDING_DOCUMENT_URLS'
+              value: workIqFundingDocumentUrls
+            }
+            {
+              name: 'WORK_IQ_FUNDING_DOCUMENT_IDENTITIES'
+              value: workIqFundingDocumentIdentities
             }
             {
               name: 'APP_ENVIRONMENT'
@@ -253,7 +233,27 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'USE_LIVE_FOUNDRY'
-              value: 'true'
+              value: useLiveFoundry ? 'true' : 'false'
+            }
+            {
+              name: 'FOUNDRY_KS_NAME'
+              value: foundryKsName
+            }
+            {
+              name: 'SEARCH_API_VERSION'
+              value: searchApiVersion
+            }
+            {
+              name: 'USE_LIVE_FUNDING_LLM'
+              value: useLiveFundingLlm ? 'true' : 'false'
+            }
+            {
+              name: 'FOUNDRY_ENDPOINT'
+              value: modelEndpoint
+            }
+            {
+              name: 'MODEL_DEPLOYMENT'
+              value: modelDeployment
             }
             {
               name: 'USE_LIVE_FABRIC'
@@ -262,26 +262,6 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'USE_LIVE_WORK'
               value: useLiveWork ? 'true' : 'false'
-            }
-            {
-              name: 'USE_LIVE_WEB'
-              value: 'true'
-            }
-            {
-              name: 'USE_MULTI_AGENT'
-              value: 'true'
-            }
-            {
-              // The 6-role specialist team drives the Assessment Steps. LIVE narration is enabled for
-              // a NARROW set of roles (LIVE_SPECIALIST_ROLES) that reason over the already-established
-              // grounded facts; the rest stay grounded. Narrating all 6 live (each re-running KB +
-              // Fabric) fans out too far and times out on the single F64 Data Agent.
-              name: 'USE_LIVE_SPECIALISTS'
-              value: useLiveSpecialists ? 'true' : 'false'
-            }
-            {
-              name: 'LIVE_SPECIALIST_ROLES'
-              value: 'eligibility,renal_labs,genomics'
             }
           ]
         }

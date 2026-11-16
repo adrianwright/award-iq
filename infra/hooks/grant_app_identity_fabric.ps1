@@ -14,4 +14,5 @@ function Require-EnvironmentValue {
   -IdentityName (Require-EnvironmentValue "AZURE_MANAGED_IDENTITY_NAME") `
   -FabricWorkspaceId (Require-EnvironmentValue "FABRIC_WORKSPACE_ID") `
   -FabricCapacityResourceGroup (Require-EnvironmentValue "FABRIC_CAPACITY_RESOURCE_GROUP") `
-  -FabricCapacityName (Require-EnvironmentValue "FABRIC_CAPACITY_NAME")
+  -FabricCapacityName (Require-EnvironmentValue "FABRIC_CAPACITY_NAME") `
+  -WorkspaceRole "Viewer"

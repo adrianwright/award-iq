@@ -1,176 +1,198 @@
-# Deployment
+# Award IQ Azure deployment
 
-This document describes the connected Azure topology first, then the deterministic local fallback
-used for safe reproducibility.
+The funding deployment uses `infra/funding.bicep` (the entry point selected by
+`infra/azure.yaml`). It provisions app resources in a new resource group independently from the existing
+Fabric capacity: Container Apps, a private-pull container registry, a managed identity,
+Static Web Apps, and monitoring. It does not create, resize, pause, or delete Fabric capacity,
+or assign permissions to existing Search/Foundry resources.
 
-> **Warning:** Live resources incur Azure charges. Review the cost section before proceeding.
-> Use `scripts/dev.ps1` whenever you want the no-cloud local walkthrough.
+With `enableFundingIntelligence=true`, it additionally creates a dedicated Basic Search service
+and keyless Foundry account/project in the same resource group, with the selected model deployment.
+The deployment uses GPT-5.6-luna (`2026-07-09`, GlobalStandard) by default; `fundingModelName` and
+`fundingModelVersion` are explicit template parameters. Search Basic has a standing service cost;
+agentic retrieval and model inference also incur usage charges. Semantic ranking uses its free
+allowance and fails explicitly if that allowance is exhausted.
+`fundingSearchLocation` can select a different supported region without moving the app or model.
+This deployment uses Central US for Search because East US 2 rejected new Search provisioning
+for lack of regional capacity; Foundry and the app remain in East US 2.
 
-## Connected Azure topology
+## Fabric isolation and loading
 
-The proof of concept's connected footprint is:
-- Azure Static Web Apps for the React UI,
-- Azure Container Apps for the FastAPI API,
-- Azure AI Search for Foundry IQ and the Web IQ stand-in,
-- Microsoft Fabric for the Lakehouse and Data Agent,
-- Azure Key Vault for the Work IQ OBO certificate, and
-- operator-provided Foundry resources referenced by configuration.
+Create a dedicated Award IQ workspace on the chosen existing capacity, then a new lakehouse.
+Do not point the seed loader at another demo's lakehouse. With the current `az` CLI identity,
+obtain Fabric and Storage tokens into process environment variables `FABRIC_TOKEN` and
+`ONELAKE_TOKEN`. Set `FABRIC_WS`, `FABRIC_LH`, and optionally `CSV_DIR`, then explicitly run
+`agent/provisioning/live/load_fabric_lakehouse.py` from the repository root.
 
-## Prerequisites
+The loader refuses nonempty lakehouses before uploading anything, creates source files with
+`If-None-Match: *`, and loads all 16 funding tables, including `source_documents`. It never uses
+overwrite mode. Failures and incomplete operations stop the load; rerunning is not a destructive
+reset mechanism. Keep existing demo workspaces, lakehouses, and tables untouched.
 
-- Azure CLI (`az`), current release
-- Azure Developer CLI (`azd`), current release
-- Python 3.12+ with the repo venv activated (`.venv`)
-- Node.js 22+ with `npm ci` run in `apps/web/`
-- An Azure subscription with sufficient quota for:
-  - Azure Container Apps
-  - Azure Static Web Apps
-  - Azure AI Search, operator-provided or pre-existing
-  - Azure Key Vault
-  - Microsoft Fabric F64 capacity, operator-provided
+## Authentication and infrastructure
 
-## Provisioning the intelligence layer
+Use separate, single-tenant Entra registrations for the API and browser client. Expose the
+API's delegated `access_as_user` scope with v2 access tokens, configure the SPA's exact HTTPS
+redirect URI, and authorize the browser client for that scope. No client secret is needed.
+Pass the API client ID as `apiAudience`, the SPA client ID as `webClientId`, and its fully
+qualified scope as `webApiScope`.
 
-The provisioning scripts in `agent/provisioning/live/` build the connected environment. They are
-idempotent, check-then-create, and require explicit operator input for every resource name.
+Use the currently signed-in Azure CLI account to deploy `infra/funding.bicep` incrementally
+into the new resource group. Supply the lakehouse's actual SQL connection string as
+`fabricSqlServer`, its SQL database name as `fabricSqlDatabase`, both Fabric item IDs, the
+tenant ID, and the existing capacity coordinates. For azd, these map to
+`infra/funding.parameters.json`; explicitly set the subscription and new resource group.
 
-```powershell
-# Review available parameters before running anything
-Get-Help ./agent/provisioning/live/provision_all.ps1 -Full
+The parameter file binds only baseline app/Fabric/Entra inputs. It does **not** bind
+`enableFundingIntelligence`, model/region overrides, `enableFundingWork`, or Work IQ certificate
+and document parameters. Supply these explicitly using an operator-reviewed parameter file or
+ARM invocation. Entra registration/consent, certificate/Key Vault setup, Fabric bootstrap and
+M365 document setup are manual prerequisites; `azd up` alone does not complete them.
 
-# Provision everything (supply every Mandatory parameter)
-./agent/provisioning/live/provision_all.ps1 `
-  -SubscriptionId <guid> `
-  -ResourceGroup  <name> `
-  ... (all Mandatory parameters)
-```
+Grant the new managed identity **Viewer** in the isolated Fabric workspace and Reader on
+the capacity for its read-only status endpoint. The azd postprovision hook requests Viewer,
+not Member. This does not grant data-write access or membership in other demo workspaces.
 
-| Script | What it provisions |
-|---|---|
-| `provision_all.ps1` | Full intelligence layer: Foundry account and models, storage, docs upload, Foundry IQ KB, Web IQ KB stand-in, Foundry project, role assignments, MCP connections, Fabric assets, hosted agent |
-| `provision_foundry_iq.ps1` | Foundry IQ only: storage, docs upload, `azureBlob` knowledge source, knowledge base, smoke test |
-| `provision_fabric_data_agent.ps1` | Fabric IQ: Lakehouse, Data Agent item, datasource, table selection, AI instructions, publish |
-| `load_fabric_lakehouse.py` | Uploads `data/fabric/*.csv` to OneLake and loads them as Delta tables |
-| `create_agent.py` | Creates or updates the hosted agent with Foundry IQ and Web IQ tools, then smoke-tests it |
-| `teardown.ps1` | Removes `amciq`-prefixed Search and Fabric items, the Foundry account, project, and storage; `-DeleteResourceGroup` removes the whole resource group |
+Build `services/api/Dockerfile` from the repository root, push it to the new registry, and
+deploy that image to the new API Container App. The image includes Microsoft ODBC Driver 18.
+Build the web app with the infrastructure's `VITE_*` outputs, then deploy `apps/web/dist`
+to the new Static Web App. Never expose a web deployment token in logs or source control.
 
-## IaC (`infra/main.bicep`)
+## Runtime guarantees and boundaries
 
-The Bicep template provisions the application hosting layer:
+The funding template sets `USE_LIVE_FABRIC=true`. Production requires
+explicit Entra configuration, a managed identity, and valid Fabric SQL coordinates.
+The API reads the allowlisted funding tables using a managed-identity SQL token, encrypted
+connections with certificate verification, and read-only SELECT statements. Local operator
+checks without a managed identity use `AzureCliCredential`, not another cached identity.
+Each assessment uses one retrieved table set. JSON requests return 503 on Fabric read failures;
+streaming requests emit an error and no final assessment. There is no CSV fallback.
+The old assessment and cohort endpoints have been removed.
 
-- Azure Container Apps managed environment, with Log Analytics and App Insights
-- Container App for the FastAPI API, port 8000
-- Azure Static Web App for the React/Vite UI
-- Azure Container Registry for `azd`-built API images
-- Azure Key Vault for the Work IQ OBO certificate
-- User-assigned managed identity shared by the API container and role assignments
+## Foundry IQ and model synthesis
 
-**Existing resources**, including Foundry, AI Search, and Fabric capacity, are **referenced by
-parameter, not recreated**.
+The assessment leads with a generated takeaway and a question-specific explanation
+(target: 100-150 words combined), key funding/deadline facts, unresolved eligibility conditions,
+and one ordered action table. It does not display intermediate IQ responses, raw document
+metadata, or duplicate task cards. Full retrieval grounding still reaches the final model;
+the internal `retrievalContext` is excluded from the public assessment serialization.
+Existing financial, recorded-status, and citation checks remain in force with no canned fallback.
 
-Key parameters, all required and operator-supplied:
+Numbered citations open the original sources. Eligibility calculations, action dependencies,
+source links, and technical provenance are collapsed by default. Retrieval progress remains
+expanded while running or on failure, collapses after success, and focus moves to the result.
+Printing produces the decision summary and action table without the question form, progress,
+or technical details. These are synthetic records and **human review is required**, not already completed.
 
-| Parameter | Description |
-|---|---|
-| `tenantId` | Entra tenant for Key Vault and the managed identity |
-| `apiContainerImage` | Container image, `azd deploy` replaces the placeholder |
-| `managedIdentityName` | Shared managed identity resource name |
-| `existingSearchServiceName` | Pre-existing AI Search service |
-| `fabricWorkspaceId` | Fabric workspace GUID |
-| `workIqClientId` | Confidential client app ID for Work IQ OBO |
-| `webClientId` | SPA public client app ID |
-| `apiAudience` | Accepted audience URI for token validation |
-| `eligibilityEvaluatorAgentName` | Foundry evaluator agent name |
+Enable the intelligence parameter when deploying infrastructure, then grant the current `az` operator
+Search Service Contributor and Search Index Data Contributor on **only the new Search service**.
+The API identity receives Search Index Data Reader and Cognitive Services OpenAI User; Search's
+system identity receives Cognitive Services User on the new Foundry account. No API keys are used.
 
-## azd workflow
-
-```powershell
-# Authenticate
-az login --use-device-code
-azd auth login
-
-# First deploy (provisions Bicep + builds and pushes container)
-azd up
-
-# Subsequent code deploys (skips Bicep)
-azd deploy
-
-# Build and push the React UI to Static Web Apps
-./agent/provisioning/live/deploy_web.ps1
-```
-
-## Enable live mode
-
-After provisioning, copy `services/api/.env.example` to `services/api/.env`, fill in the
-operator-owned coordinates, then enable the live flags you intend to use:
-
-```dotenv
-USE_LIVE_FOUNDRY=true
-USE_LIVE_FABRIC=true
-USE_LIVE_WORK=true       # only if the M365 tenant is seeded
-USE_LIVE_WEB=true
-USE_LIVE_AGENT=true      # only if the hosted agent is provisioned
-APP_ENVIRONMENT=production
-```
-
-Do not use `scripts/dev.ps1` for connected validation, it always forces local fallback mode.
-Start the backend manually with the live environment variables set.
-
-## Cost considerations
-
-| Component | Cost driver | How to minimize |
-|---|---|---|
-| Azure Container Apps | Per-second CPU + memory when handling requests | Scale to zero when not in use |
-| Azure Static Web Apps | Bandwidth; Standard tier for custom domains | Free tier can cover low-traffic reviews |
-| Azure AI Search | Search units, plus agentic-retrieval inference | Delete or pause between operator sessions |
-| Azure Container Registry | Storage + pull operations | Use Basic tier |
-| Azure Key Vault | Operations per certificate read | Cached in process for five minutes |
-| Foundry Agent Service | Model inference tokens per assessment | Disable `USE_LIVE_AGENT` when not needed |
-| Microsoft Fabric F64 capacity | Per-second charges when Active | Suspend when cost control is desired |
-| Work IQ, when GA billing applies | API call charges | Disable `USE_LIVE_WORK` when not testing |
-| Bing web KB, Web IQ stand-in | Bing search transactions + inference | Disable `USE_LIVE_WEB` when not needed |
-
-Set Azure Budget alerts on the subscription before enabling live resources.
-
-## Deterministic local fallback
-
-`scripts/dev.ps1` always disables live flags, clears Entra SPA values, points `DATA_DIR` at the
-checked-in synthetic package, starts the API in local mode, and launches the Vite UI without cloud
-dependencies. Use it for reproducible walkthroughs that do not require connected services.
-
-## Clean-clone validation (pre-release)
-
-Before declaring the repository ready for handoff, validate from a fresh checkout:
+Using the same signed-in CLI identity, run this once from the repository root with the infrastructure
+outputs:
 
 ```powershell
-git clone <repo-url> amciq-fresh
-cd amciq-fresh
-./scripts/dev.ps1
-# Validate: backend starts, UI renders, hero question answers correctly
-.\.venv\Scripts\python tools/validate_consistency.py
-cd services/api; ..\..\.venv\Scripts\python -m pytest
-cd apps/web; npm test
+py -3.13 agent\provisioning\live\provision_funding_knowledge.py `
+  --search-endpoint <SEARCH_ENDPOINT> --model-endpoint <FOUNDRY_ENDPOINT> `
+  --model-deployment <MODEL_DEPLOYMENT> --model-name gpt-5.6-luna
 ```
 
-The proof of concept is not ready if it only works in the original development environment.
+The script indexes only funding documents named in `source_documents.csv`. It creates `award-iq-funding-docs`, `award-iq-funding-ks`, and `award-iq-funding-kb`.
+Creation uses `If-None-Match: *`; an existing index/source/base stops provisioning rather than
+overwriting it. A partially completed run must be inspected before resuming; never delete existing
+demo resources to retry. No Fabric or M365 writes occur.
 
-## Teardown
+Deploy the updated API with `USE_LIVE_FOUNDRY=true`, `FOUNDRY_KS_NAME`, `FOUNDRY_KB_NAME`,
+`SEARCH_ENDPOINT`, `SEARCH_API_VERSION=2026-08-01-preview`, `USE_LIVE_FUNDING_LLM=true`,
+`FOUNDRY_ENDPOINT`, and `MODEL_DEPLOYMENT` (the funding template supplies these when enabled).
+Do not direct traffic to that revision until knowledge provisioning succeeds.
 
-```powershell
-# Remove amciq-prefixed IQ resources (keeps the resource group)
-Get-Help ./agent/provisioning/live/teardown.ps1 -Full
-./agent/provisioning/live/teardown.ps1 -SubscriptionId <guid> -ResourceGroup <name>
+Each assessment queries the actual knowledge-base retrieve API, filtered by notice and effective
+date, including an exclusive supersession date. The current governing document must be retrieved.
+Citation snippets come from returned source data, never local document reads. Citation links open
+the packaged copy of the exact document uploaded during provisioning; the provenance labels that
+copy explicitly. Unretrieved documents are not presented as live citations.
 
-# Remove the entire resource group (all Azure resources)
-./agent/provisioning/live/teardown.ps1 -SubscriptionId <guid> -ResourceGroup <name> -DeleteResourceGroup
+The final answer and bottom line use the real model's structured-output API over the reconciled
+facts and evidence. Financial calculations and status fields remain deterministic. Responses carry
+`knowledgeMode` and the actual returned `narrativeModel`; traces record live retrieval/model latency.
+Unknown citations, changed dollar amounts, missing recorded status, source failures, model errors
+and incomplete model output fail explicitly with 503 or an SSE error, never a canned answer.
+These checks do not prove every generated statement correct; human review is still required.
 
-# Suspend, not delete, the Fabric capacity to stop per-second charges
-az fabric capacity suspend --subscription <guid> --resource-group <rg> --capacity-name <name>
-```
+## Funding Work IQ integration
 
-## Known preview boundaries
+The opt-in funding path forwards the authenticated API user's token to the existing certificate-backed
+on-behalf-of client. Configure `enableFundingWork`, the API app client ID, the Key Vault URI and
+certificate secret, and `workIqFundingDocumentUrls`: a JSON object mapping current funding document
+IDs to their exact, non-token-bearing HTTPS SharePoint links. The certificate must be registered on
+the API app, and its managed identity must be able to read the Key Vault secret. Set up and verify
+these resources separately before enabling the flag.
 
-- AI Search agentic retrieval requires `message.content` as an array of parts, not a string.
-- The `2026-05-01-preview` API version may change, monitor Azure AI Search release notes.
-- The Fabric Data Agent is consumed through its MCP endpoint with `ProjectManagedIdentity`.
-- Work IQ requires a seeded M365 tenant, there is no self-service setup path in this repository.
+The authenticated operator diagnostic `POST /api/workiq/check` exercises the same
+certificate-backed OBO flow with a fixed acknowledgment-only prompt.
+This check can run while `USE_LIVE_WORK=false`; configure the client ID and certificate settings
+first. It does not verify document access or indexing and does not enable live funding retrieval.
+It is not a separate user-facing assessment action. No access tokens or certificate material should
+be copied into chat or logs.
+
+After verifying document identities and configuring their canonical URLs, operators can call
+the same authenticated diagnostic with one allowlisted `notice_id` at a time. It runs the normal
+Fabric, Foundry, Work IQ and final-model assessment with live Work IQ enabled only for that explicit
+request, leaving the global setting unchanged. A successful response requires live attributed Work IQ
+evidence; it is not returned on source or model failure. This verifies the returned citations, not
+that every configured file was indexed or cited.
+
+The user-facing **Assess funding readiness** action always uses the configured IQ sources together.
+With `USE_LIVE_WORK=true`, it includes delegated Work IQ in the same Fabric/Foundry assessment and
+final model context; there is no separate Work IQ button or automatic packaged Work fallback.
+The SSE stream reports each source when its operation actually starts and finishes. A later source
+failure preserves earlier retrieval results; the browser marks sources that never started as skipped.
+Fabric first resolves the authoritative notice, amendment and document scope. Foundry IQ, Work IQ and
+packaged external guidance then load concurrently before the final assessment is synthesized.
+The retrieval panel uses source icons, activity indicators, elapsed times and returned evidence
+counts. It distinguishes retrieval from final answer generation, preserves successful source states
+on failure, and respects reduced-motion preferences. No percentage or simulated progress is shown.
+
+Work IQ `WorkIQAgent.Ask` requires tenant admin consent and a Copilot Studio usage-based billing plan
+with an Azure subscription and resource group, with the user assigned to the plan. Microsoft describes this
+delegated permission as including **read and write** access to Microsoft 365 resources accessible to
+Work IQ agents on behalf of that user; it is broader than this application's read-only use. Obtain
+the administrator's approval before granting it. Do not confuse this with an application permission.
+
+Funding uses the public-preview MCP `retrieve` tool at `WORK_IQ_MCP_ENDPOINT` (default
+`https://workiq.svc.cloud.microsoft/mcp`), not a synthesized A2A answer. It discovers the live tool
+schema and requests the `grounding` strategy with `OneDriveAndSharePoint.items_by_url` restricted to
+configured current document URLs for the selected notice. The same delegated `WorkIQAgent.Ask`
+permission and certificate-backed OBO flow are used; no Graph permission is added.
+
+The adapter reads `structuredContent["application/vnd.ms-workiq.retrieval"].results`, binds each
+result's Markdown to its own returned URL and citation ID, and retains the sensitivity display label.
+Only completed retrievals with explicitly allowed content protection are accepted. Source matching
+allows canonical URLs or a unique, case-insensitive filename on the configured SharePoint host.
+Filenames can come from the returned URL path, a viewer link's `file` parameter, or returned document
+title metadata. This relaxed demo rule can match a same-named copy elsewhere on that host; it is not
+proof of folder isolation. Filename matches retain the actual returned source link for review.
+Duplicate filename matches, unrelated hosts, and known conflicting identities are rejected.
+The `workIqFundingDocumentIdentities` deployment parameter supplies
+`WORK_IQ_FUNDING_DOCUMENT_IDENTITIES`, binding document IDs to setup-verified
+`webUrl`, `driveId` and `itemId` values, allowing alternate viewer links without filename metadata.
+Configure it when Work IQ returns opaque SharePoint viewer links; URL or filename matching alone
+cannot identify those links. Obtain it with the read-only inspector's `--identity-output` option.
+Rejected sources produce bounded structural diagnostics, not document content or access tokens.
+Missing evidence, unknown citations, partial results and service errors stop the
+assessment without switching tools, strategies or sources. Generated grounding is not a verbatim
+document excerpt; claims still require human review. The broad delegated permission remains broader
+than this per-request source scope. M365 indexing and retrieval availability must be verified against
+the actual tenant. No live Work IQ configuration or document set is included by default.
+
+See Microsoft's [Work IQ retrieve contract](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/work-iq/mcp/retrieve).
+
+The data remains **synthetic**, even when stored and queried through real services. External
+guidance remains packaged; until Work IQ is configured, proposal workflow records are stored in
+Fabric and packaged documents, not synchronized with M365.
+The application never approves funding, writes tasks, sends mail, books meetings, or submits
+applications.
+
+The root README's local mock walkthrough remains available without Azure credentials.

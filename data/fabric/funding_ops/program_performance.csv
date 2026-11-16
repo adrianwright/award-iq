@@ -1,0 +1,5 @@
+metric_id,program_id,project_id,measure,baseline_value,actual_value,proposed_target,period,unit,source_document_id
+PERF-RES-01,PROGRAM-RESILIENCE,PROJECT-RESILIENCE-2026,Critical facilities with backup power,35,,70,2026 baseline / proposed project target,percent,DOC-FO117-PERFORMANCE
+PERF-RES-02,PROGRAM-RESILIENCE,PROJECT-RESILIENCE-2026,Prior city resilience projects delivered on schedule,8,8,,2025-2026,projects out of 10,DOC-FO117-PERFORMANCE
+PERF-HEAT-01,PROGRAM-HEAT-READY,PROJECT-HEAT-READY-2026,Public facilities with cooling access,4,,8,2026 baseline / proposed project target,facilities,DOC-FO204-TERMS
+PERF-RURAL-01,PROGRAM-RURAL-ACCESS,PROJECT-RURAL-ACCESS-2026,Rural service routes served,0,,3,2026 proposed project target,routes,DOC-FO330-TERMS

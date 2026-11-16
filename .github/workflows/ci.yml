@@ -60,7 +60,7 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q services/api/app agent/provisioning/live
       - name: Compile Bicep
-        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+        run: az bicep build --file infra/funding.bicep --stdout > /dev/null
       - name: Check patch whitespace
         shell: bash
         run: |

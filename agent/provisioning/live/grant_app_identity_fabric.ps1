@@ -3,8 +3,8 @@
   Grant the deployed app's managed identity access to Fabric and its backing capacity.
 .DESCRIPTION
   The API Container App runs as the operator-selected user-assigned managed identity created by the
-  infrastructure template. For live Fabric IQ (`USE_LIVE_FABRIC=true`) the app calls the Fabric Data Agent
-  MCP endpoint with that identity's token, so the identity must be a member of the Fabric workspace.
+  infrastructure template. For live Fabric SQL (`USE_LIVE_FABRIC=true`) the app reads the isolated
+  funding lakehouse with that identity's token, so the identity needs Viewer access to its workspace.
   The UI also reads the backing Fabric capacity state through ARM, so the identity needs Reader on
   that capacity resource. The workspace step is a Fabric REST call (not ARM), so this script runs as
   an azd `postprovision` hook (see infra/azure.yaml) or standalone after `azd up`.
@@ -21,7 +21,8 @@ param(
   [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$FabricWorkspaceId,
   [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$Subscription,
   [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$FabricCapacityResourceGroup,
-  [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$FabricCapacityName
+  [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$FabricCapacityName,
+  [ValidateSet("Viewer", "Member")][string]$WorkspaceRole = "Member"
 )
 $ErrorActionPreference = "Stop"
 
@@ -40,11 +41,11 @@ if ($LASTEXITCODE -ne 0 -or -not $fabTok) {
 $roleAssignmentsUri = "https://api.fabric.microsoft.com/v1/workspaces/$FabricWorkspaceId/roleAssignments"
 $roleAssignments = Invoke-RestMethod -Headers @{ Authorization = "Bearer $fabTok" } -Uri $roleAssignmentsUri
 $existingMembership = @($roleAssignments.value) | Where-Object { $_.principal.id -eq $principalId }
-$body = @{ principal = @{ id = $principalId; type = "ServicePrincipal" }; role = "Member" } | ConvertTo-Json
+$body = @{ principal = @{ id = $principalId; type = "ServicePrincipal" }; role = $WorkspaceRole } | ConvertTo-Json
 if (-not $existingMembership) {
   Invoke-RestMethod -Method Post -Headers @{ Authorization = "Bearer $fabTok"; "Content-Type" = "application/json" } `
     -Uri "https://api.fabric.microsoft.com/v1/workspaces/$FabricWorkspaceId/roleAssignments" -Body $body | Out-Null
-  Write-Host "  granted $IdentityName ($principalId) Member on Fabric workspace $FabricWorkspaceId" -ForegroundColor Green
+  Write-Host "  granted $IdentityName ($principalId) $WorkspaceRole on Fabric workspace $FabricWorkspaceId" -ForegroundColor Green
 } else {
   Write-Host "  $IdentityName already has Fabric workspace access" -ForegroundColor DarkGray
 }

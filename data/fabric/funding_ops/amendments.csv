@@ -1,0 +1,5 @@
+amendment_id,notice_id,version,published_date,effective_date,predecessor_id,changed_conditions,match_rate,match_basis,regional_partner_required,status,source_document_id
+AMD-FO117-01,FO-2026-117,1,2026-09-10,2026-09-10,,Original local match requirement was 20%; no regional letter condition.,0.20,total eligible project costs,false,Superseded,DOC-FO117-AMD1
+AMD-FO117-02,FO-2026-117,2,2026-10-28,2026-10-28,AMD-FO117-01,Raises local match to 25% and adds signed regional-partner commitment-letter requirement.,0.25,total eligible project costs,true,Current,DOC-FO117-AMD2
+AMD-FO204-01,FO-2026-204,1,2026-09-01,2026-09-01,,Requires 10% local match; an approved partner waiver removes the partner condition.,0.10,total eligible project costs,false,Current,DOC-FO204-TERMS
+AMD-FO330-01,FO-2026-330,1,2026-10-01,2026-10-01,,"Requires applicant and project to be in the designated rural service area, plus 10% local match.",0.10,total eligible project costs,false,Current,DOC-FO330-TERMS

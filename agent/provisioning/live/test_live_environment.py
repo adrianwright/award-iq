@@ -25,14 +25,6 @@ def test_required_environment_strips_operator_value(monkeypatch: pytest.MonkeyPa
     assert required_environment("OPERATOR_RESOURCE_ID") == "test-resource"
 
 
-def test_teardown_requires_explicit_foundry_account_deletion_switch() -> None:
-    script = (LIVE_DIR / "teardown.ps1").read_text(encoding="utf-8")
-
-    guard = script.index("if ($DeleteFoundryAccount)")
-    account_delete = script.index("az cognitiveservices account delete")
-    assert guard < account_delete
-
-
 def test_web_deploy_reads_azd_only_when_auth_arguments_are_missing() -> None:
     script = (LIVE_DIR / "deploy_web.ps1").read_text(encoding="utf-8")
 

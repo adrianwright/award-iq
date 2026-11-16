@@ -1,0 +1,5 @@
+person_id,name,role,team,email
+PM-01,Jordan Lee,Proposal Manager,Grant Proposal Team,jordan.lee@example.invalid
+FIN-02,Maria Santos,Finance,Budget and Finance,maria.santos@example.invalid
+EXEC-01,Dr. Elena Ruiz,Executive Reviewer,Program Leadership,elena.ruiz@example.invalid
+LEGAL-01,Sam Patel,Legal,Legal and Procurement,sam.patel@example.invalid

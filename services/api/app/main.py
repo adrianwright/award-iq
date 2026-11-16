@@ -1,31 +1,33 @@
 from __future__ import annotations
 
+import asyncio
 import html as _html
+import json
 import re
-from dataclasses import asdict
-from typing import Any
+import threading
+from contextlib import suppress
+from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from starlette.concurrency import run_in_threadpool
 from sse_starlette.sse import EventSourceResponse
 
 from app.auth import AuthenticatedUser, require_api_user
 from app.config import get_settings
-from app.eligibility import EligibilityUnavailable, evaluate_eligibility
 from app.fabric_status import get_fabric_status
-from app.orchestrator import Orchestrator
-from app.registry import load_registry, maybe_find_by_id
-from app.schemas import AskRequest, AskResult
-from app.streaming import sse_response
+from app.funding import FundingAssessment, FundingSourceProgress, assess_funding
+from app.sources.fabric_funding import FundingDataUnavailable
+from app.schemas import AskRequest
+from app.workiq import WorkIQClient, WorkIQError
 
 settings = get_settings()
-orchestrator = Orchestrator(settings=settings)
 
-_ALLOWED_DOC_DIRS = {"foundry_docs", "work"}
+_ALLOWED_DOC_DIRS = {"foundry_docs", "work", "web", "funding_ops"}
 _DOC_NAME = re.compile(r"[A-Za-z0-9._-]+\.(md|json)$")
 
-app = FastAPI(title="AMC IQ API", version="0.1.0")
+app = FastAPI(title="Award IQ API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -57,7 +59,12 @@ def evidence_doc(path: str) -> HTMLResponse:
     if len(parts) != 2 or parts[0] not in _ALLOWED_DOC_DIRS or not _DOC_NAME.fullmatch(parts[1]):
         raise HTTPException(status_code=404, detail="Document not found")
     subdir, name = parts
-    base = (settings.DATA_DIR / subdir).resolve()
+    base_dir = (
+        settings.DATA_DIR / "fabric" / "funding_ops"
+        if subdir == "funding_ops"
+        else settings.DATA_DIR / subdir
+    )
+    base = base_dir.resolve()
     target = (base / name).resolve()
     if base not in target.parents or not target.is_file():
         raise HTTPException(status_code=404, detail="Document not found")
@@ -73,55 +80,156 @@ def evidence_doc(path: str) -> HTMLResponse:
         "border-radius:8px;padding:1.25rem}"
         ".src{color:#6b7280;font-size:12px;margin-bottom:1rem;text-transform:uppercase;"
         "letter-spacing:.05em}</style></head>"
-        f"<body><div class='src'>AMC IQ synthetic source document &middot; {title}</div>"
+        f"<body><div class='src'>Award IQ synthetic source document &middot; {title}</div>"
         f"<pre>{body}</pre></body></html>"
     )
     return HTMLResponse(page)
 
 
-@app.post("/api/ask", response_model=AskResult)
-def ask(
+@app.post("/api/funding/ask", response_model=FundingAssessment)
+def ask_funding(
     request: AskRequest,
     user: AuthenticatedUser | None = Depends(require_api_user),
-) -> AskResult:
+) -> FundingAssessment:
+    """Assess synthetic funding records from the configured authoritative data source."""
     try:
-        return orchestrator.answer(request, user.access_token if user else None)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc)) from exc
-    except EligibilityUnavailable as exc:
+        return assess_funding(settings, request.question, user_access_token=user.access_token if user else None)
+    except FundingDataUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@app.post("/api/ask/stream")
-def ask_stream(
+@app.post("/api/workiq/check")
+def check_workiq(
+    notice_id: Literal["FO-2026-117", "FO-2026-204", "FO-2026-330"] | None = None,
+    user: AuthenticatedUser | None = Depends(require_api_user),
+) -> dict[str, str | int]:
+    """Check connectivity, or explicitly verify one notice without changing normal assessments."""
+    if user is None:
+        raise HTTPException(status_code=401, detail="A signed-in user is required for Work IQ.")
+    if notice_id is not None:
+        try:
+            assessment = assess_funding(
+                settings.model_copy(update={"USE_LIVE_WORK": True}),
+                notice_id,
+                user_access_token=user.access_token,
+            )
+        except FundingDataUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        citations = [item for item in assessment.evidence if item.source.value == "work"]
+        if assessment.workMode != "work_iq" or not citations:
+            raise HTTPException(status_code=503, detail="No verified live Work IQ evidence was returned.")
+        return {
+            "status": "verified",
+            "noticeId": notice_id,
+            "citationCount": len(citations),
+            "message": f"{notice_id}: live Work IQ evidence and final assessment verified.",
+        }
+    try:
+        answer = WorkIQClient(settings).ask(
+            user_assertion=user.access_token,
+            question=(
+                "This is an Award IQ connection check. Reply with exactly AWARD_IQ_CONNECTED. "
+                "Do not search, read, summarize or change any workplace data. Do not use any tools."
+            ),
+        )
+    except WorkIQError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if answer.text.strip() != "AWARD_IQ_CONNECTED":
+        raise HTTPException(
+            status_code=503,
+            detail="Work IQ responded, but did not return the expected connection-check acknowledgment.",
+        )
+    return {
+        "status": "connected",
+        "durationMs": answer.duration_ms,
+        "message": "Work IQ responded through delegated authentication. Document access is not yet verified.",
+    }
+
+
+@app.post("/api/funding/ask/stream")
+async def ask_funding_stream(
     request: AskRequest,
     user: AuthenticatedUser | None = Depends(require_api_user),
 ) -> EventSourceResponse:
-    return sse_response(request, orchestrator, user.access_token if user else None)
+    """Stream funding progress; live-source and model failures never fall back to fixtures."""
+    async def events():
+        sources = [
+            ("foundry", "Funding notice and current amendment"),
+            ("fabric", "Grant operations and match records"),
+            ("work", "Proposal tasks and reviewer calendar"),
+            ("web", "Synthetic agency guidance snapshot"),
+        ]
+        yield {
+            "event": "plan",
+            "data": json.dumps({"steps": ["Check current notice and amendment", "Reconcile confirmed match and eligibility evidence", "Review proposal tasks and deadlines", "Prepare human-review assessment"]}),
+        }
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[FundingSourceProgress | None] = asyncio.Queue()
+        closed = threading.Event()
 
+        def progress(update: FundingSourceProgress) -> None:
+            if not closed.is_set():
+                loop.call_soon_threadsafe(queue.put_nowait, update)
 
-# ---- Cohort exploration (read-only) --------------------------------------------------------------
-# Per-(patient, trial) eligibility over the synthetic cohort, evaluated on Fabric-native services
-# (Fabric Data Agent facts + the Foundry eligibility-evaluator agent). Cohort-wide RANKING views
-# (near-eligible patients, candidate trials) require Fabric Graph traversal (NL2Ontology) and are
-# served from Fabric IQ directly once the graph is provisioned, not from this API.
+        task = asyncio.create_task(run_in_threadpool(
+            assess_funding, settings, request.question,
+            user_access_token=user.access_token if user else None,
+            on_progress=progress,
+        ))
+        task.add_done_callback(lambda _: queue.put_nowait(None))
+        active_sources: set[str] = set()
+        reported_failure = False
+        try:
+            while (update := await queue.get()) is not None:
+                searching = update.status == "searching"
+                if searching:
+                    active_sources.add(update.source.value)
+                else:
+                    active_sources.discard(update.source.value)
+                reported_failure = reported_failure or update.status == "failed"
+                yield {
+                    "event": "source_query" if searching else "source_result",
+                    "data": json.dumps({**update.model_dump(mode="json"), "query": request.question}),
+                }
+            preliminary = await task
+        except FundingDataUnavailable as exc:
+            if not reported_failure:
+                for source in sorted(active_sources):
+                    yield {
+                        "event": "source_result",
+                        "data": json.dumps({
+                            "source": source, "status": "failed", "summary": str(exc),
+                            "citations": [], "durationMs": 0,
+                        }),
+                    }
+            yield {"event": "error", "data": json.dumps({"message": str(exc)})}
+            return
+        finally:
+            closed.set()
+            if not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+        retrieved = {item["source"]: item for item in preliminary.sourceMap}
+        for source, label in sources:
+            source_result = retrieved[source]
+            state = source_result["status"]
+            citations = source_result["citations"]
+            summary = (
+                source_result["summary"]
+                if citations
+                else "No synthetic evidence is available for this source and opportunity."
+            )
+            yield {
+                "event": "source_result",
+                "data": json.dumps({
+                    "source": source,
+                    "status": state,
+                    "summary": summary,
+                    "citations": citations,
+                    "durationMs": source_result["durationMs"],
+                }),
+            }
+        yield {"event": "final", "data": json.dumps({"result": preliminary.model_dump()})}
 
-
-@app.get("/api/cohort/patients/{patient_id}/trials/{trial_id}/eligibility")
-def cohort_eligibility(
-    patient_id: str,
-    trial_id: str,
-    _user: AuthenticatedUser | None = Depends(require_api_user),
-) -> list[dict[str, Any]]:
-    """Per-criterion eligibility evaluation for a (patient, trial) via Fabric-native services."""
-    registry = load_registry()
-    if maybe_find_by_id(registry["patients"], patient_id) is None:
-        raise HTTPException(status_code=404, detail=f"Unknown patient id: {patient_id}")
-    if maybe_find_by_id(registry["trials"], trial_id) is None:
-        raise HTTPException(status_code=404, detail=f"Unknown trial id: {trial_id}")
-    try:
-        return [asdict(result) for result in evaluate_eligibility(settings, patient_id, trial_id)]
-    except EligibilityUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return EventSourceResponse(events())
