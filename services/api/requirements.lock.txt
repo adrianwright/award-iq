@@ -47,7 +47,7 @@ cryptography==49.0.0
     #   pyjwt
 distro==1.9.0
     # via openai
-fastapi==0.140.0
+fastapi==0.165.0
     # via -r services/api/requirements.txt
 h11==0.16.0
     # via
